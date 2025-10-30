@@ -7,5 +7,9 @@ isort~=6.1.0
 # test
 pytest~=8.4.2
 
+# segmentation
+numpy~=2.2.6
+opencv-python~=4.12.0
+
 # postprocess
 Jinja2~=3.1.6
