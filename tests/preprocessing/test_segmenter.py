@@ -26,12 +26,13 @@ def dummy_binary_image():
 
 # --- preprocess_image ---
 
+
 def test_preprocess_image_valid_input_success(tmp_path):
     dummy_image_path = tmp_path / "dummy.png"
     cv2.imwrite(str(dummy_image_path), np.ones((10, 10), dtype=np.uint8) * 255)
-    
+
     binary = preprocess_image(str(dummy_image_path))
-    
+
     assert isinstance(binary, np.ndarray)
     assert binary.dtype == np.uint8
     assert binary.shape == (10, 10)
@@ -44,6 +45,7 @@ def test_preprocess_image_invalid_path_raise_error():
 
 # --- detect_staff_lines ---
 
+
 def test_detect_staff_lines_valid_image_success(dummy_binary_image):
     result = detect_staff_lines(dummy_binary_image)
 
@@ -52,6 +54,7 @@ def test_detect_staff_lines_valid_image_success(dummy_binary_image):
 
 
 # --- group_staff_lines ---
+
 
 def test_group_staff_lines_detected_lines_success(dummy_binary_image):
     detected_mask = detect_staff_lines(dummy_binary_image)
@@ -68,6 +71,7 @@ def test_group_staff_lines_empty_mask_success():
 
 
 # --- group_into_staves ---
+
 
 def test_group_into_staves_multiple_staves_success():
     lines = [10, 20, 30, 40, 50, 100, 110, 120, 130, 140]
@@ -89,6 +93,7 @@ def test_group_into_staves_empty_input_success():
 
 # --- remove_staff_lines ---
 
+
 def test_remove_staff_lines_success(dummy_binary_image):
     """Ensure remove_staff_lines returns an image of same shape."""
     detected_mask = detect_staff_lines(dummy_binary_image)
@@ -98,6 +103,7 @@ def test_remove_staff_lines_success(dummy_binary_image):
 
 
 # --- segment_staves ---
+
 
 def test_segment_staves_multiple_staves_success(dummy_binary_image):
     detected_mask = detect_staff_lines(dummy_binary_image)
@@ -109,11 +115,14 @@ def test_segment_staves_multiple_staves_success(dummy_binary_image):
 
 # --- segment_music_sheet ---
 
+
 @patch("omr.preprocessing.segmenter.preprocess_image")
 @patch("omr.preprocessing.segmenter.detect_staff_lines")
 @patch("omr.preprocessing.segmenter.segment_staves")
 @patch("omr.preprocessing.segmenter.remove_staff_lines")
-def test_segment_music_sheet_pipeline_success(mock_remove, mock_segment, mock_detect, mock_preprocess):
+def test_segment_music_sheet_pipeline_success(
+    mock_remove, mock_segment, mock_detect, mock_preprocess
+):
     mock_img = np.zeros((100, 200), dtype=np.uint8)
     mock_preprocess.return_value = mock_img
     mock_detect.return_value = mock_img
@@ -129,6 +138,7 @@ def test_segment_music_sheet_pipeline_success(mock_remove, mock_segment, mock_de
 def test_segment_music_sheet_invalid_path_raise_error(monkeypatch):
     def mock_preprocess(_):
         raise ValueError("Invalid image path")
+
     monkeypatch.setattr("omr.preprocessing.segmenter.preprocess_image", mock_preprocess)
 
     with pytest.raises(ValueError):

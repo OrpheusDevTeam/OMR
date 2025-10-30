@@ -13,16 +13,19 @@ logger = logging.getLogger(__name__)
 
 def preprocess_image(img_path):
     """Load and binarize image."""
-    grayscale_image  = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    grayscale_image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+
     if grayscale_image is None:
         logger.error(f"Failed to load image: {img_path}")
         raise ValueError(f"Could not read image: {img_path}")
-    
-    _, binary_image  = cv2.threshold(grayscale_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    
+
+    _, binary_image = cv2.threshold(
+        grayscale_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+    )
+
     logger.debug(f"Image shape: {binary_image.shape}, dtype: {binary_image.dtype}")
 
-    return binary_image 
+    return binary_image
 
 
 def detect_staff_lines(binary_image):
@@ -38,11 +41,13 @@ def detect_staff_lines(binary_image):
     horizontal_structure = cv2.getStructuringElement(
         cv2.MORPH_RECT, (horizontal_size, 1)
     )
-    detected_lines_mask = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, horizontal_structure)
+    detected_lines_mask = cv2.morphologyEx(
+        binary_image, cv2.MORPH_OPEN, horizontal_structure
+    )
     return detected_lines_mask
 
 
-def group_staff_lines(detected_lines_mask , spacing_threshold=10):
+def group_staff_lines(detected_lines_mask, spacing_threshold=10):
     """
     Group nearby horizontal lines into individual staff lines.
 
@@ -110,12 +115,17 @@ def group_into_staves(staff_line_positions, tolerance=15):
 def remove_staff_lines(binary_image, detected_lines_mask):
     """Remove detected staff lines using inpainting."""
     no_staff = cv2.inpaint(
-        binary_image, detected_lines_mask, inpaintRadius=INPAINT_RADIUS, flags=cv2.INPAINT_TELEA
+        binary_image,
+        detected_lines_mask,
+        inpaintRadius=INPAINT_RADIUS,
+        flags=cv2.INPAINT_TELEA,
     )
     return no_staff
 
 
-def segment_staves(binary_image, detected_lines_mask, spacing_threshold=10, tolerance=15):
+def segment_staves(
+    binary_image, detected_lines_mask, spacing_threshold=10, tolerance=15
+):
     """
     Get individual staff regions from the full image.
 
@@ -139,7 +149,6 @@ def segment_staves(binary_image, detected_lines_mask, spacing_threshold=10, tole
     return staff_regions
 
 
-
 def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
     """
     Run the full segmentation pipeline on a sheet music image.
@@ -154,7 +163,7 @@ def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
         img_path (str): Path to the music sheet image.
         spacing_threshold (int): Pixel threshold for grouping nearby line pixels.
         tolerance (int): Allowed spacing variation when grouping lines into staves.
-    
+
     Returns:
         SegmenterOutput:
             staff_regions: list of original staff crops (with lines)
@@ -162,15 +171,22 @@ def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
     """
     binary = preprocess_image(img_path)
     detected_lines = detect_staff_lines(binary)
-    staff_regions = segment_staves(binary, detected_lines, spacing_threshold=spacing_threshold, tolerance=tolerance)
-    no_staff = remove_staff_lines(binary, detected_lines)
-    staff_regions_no_lines = segment_staves(no_staff, detected_lines, spacing_threshold=spacing_threshold, tolerance=tolerance)
-    
-    logger.debug(
-        f"Output: {len(staff_regions)} staff regions"
+    staff_regions = segment_staves(
+        binary, detected_lines, spacing_threshold=spacing_threshold, tolerance=tolerance
     )
+    no_staff = remove_staff_lines(binary, detected_lines)
+    staff_regions_no_lines = segment_staves(
+        no_staff,
+        detected_lines,
+        spacing_threshold=spacing_threshold,
+        tolerance=tolerance,
+    )
+
+    logger.debug(f"Output: {len(staff_regions)} staff regions")
 
     return SegmenterOutput(
         staff_regions=staff_regions,
-        staff_regions_no_lines=[cv2.bitwise_not(region) for region in staff_regions_no_lines]
+        staff_regions_no_lines=[
+            cv2.bitwise_not(region) for region in staff_regions_no_lines
+        ],
     )
