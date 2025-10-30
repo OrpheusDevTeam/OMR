@@ -172,5 +172,5 @@ def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
 
     return SegmenterOutput(
         staff_regions=staff_regions,
-        staff_regions_no_lines=staff_regions_no_lines
+        staff_regions_no_lines=[cv2.bitwise_not(region) for region in staff_regions_no_lines]
     )
