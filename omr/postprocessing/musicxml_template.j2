@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+        "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1">
+      <part-name>Music</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+  {% for measure in score.measures %}
+    <measure number="{{ loop.index }}">
+      {% if loop.first %}
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths></key>
+        <time>
+          <beats>{{ score.time_signature.beats }}</beats>
+          <beat-type>{{ score.time_signature.beat_type }}</beat-type>
+        </time>
+        <clef>
+          <sign>{{ score.clef.value }}</sign>
+          <line>2</line>
+        </clef>
+      </attributes>
+      {% endif %}
+
+      {% for note in measure.notes %}
+      <note>
+        <pitch>
+          <step>{{ note.pitch.step }}</step>
+          <octave>{{ note.pitch.octave }}</octave>
+        </pitch>
+        <duration>1</duration>
+        <type>{{ note.duration.value }}</type>
+        {% for _ in range(note.dots) %}
+        <dot/>
+        {% endfor %}
+      </note>
+      {% endfor %}
+    </measure>
+  {% endfor %}
+  </part>
+</score-partwise>
