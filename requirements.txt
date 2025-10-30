@@ -11,6 +11,7 @@ pytest~=8.4.2
 PyYAML~=6.0.3
 
 # preprocess
+PyMuPDF~=1.26.5
 numpy~=2.2.6
 opencv-python~=4.12.0
 
