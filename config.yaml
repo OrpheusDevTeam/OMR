@@ -1,0 +1,10 @@
+app:
+  name: orpheus-omr
+  version: 0.1.0
+  description: Optical Music Recognition tool
+
+formats:
+  supported:
+    - jpg
+    - png
+    - pdf
