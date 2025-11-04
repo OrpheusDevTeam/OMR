@@ -1,0 +1,10 @@
+[run]
+omit =
+    */.pytest_cache/*
+    */__pycache__/*
+    /.*/*
+    config*.py
+    tests/*
+    */__init__.py
+
+source = omr
