@@ -11,16 +11,10 @@ INPAINT_RADIUS = 3  # radius for inpainting to remove lines
 logger = logging.getLogger(__name__)
 
 
-def preprocess_image(img_path):
+def preprocess_image(image: cv2.typing.MatLike):
     """Load and binarize image."""
-    grayscale_image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-
-    if grayscale_image is None:
-        logger.error(f"Failed to load image: {img_path}")
-        raise ValueError(f"Could not read image: {img_path}")
-
     _, binary_image = cv2.threshold(
-        grayscale_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
 
     logger.debug(f"Image shape: {binary_image.shape}, dtype: {binary_image.dtype}")
@@ -28,7 +22,7 @@ def preprocess_image(img_path):
     return binary_image
 
 
-def detect_staff_lines(binary_image):
+def detect_staff_lines(binary_image: cv2.typing.MatLike) -> cv2.typing.MatLike:
     """
     Detect horizontal staff lines using morphological operations.
 
@@ -47,7 +41,9 @@ def detect_staff_lines(binary_image):
     return detected_lines_mask
 
 
-def group_staff_lines(detected_lines_mask, spacing_threshold=10):
+def group_staff_lines(
+    detected_lines_mask: cv2.typing.MatLike, spacing_threshold=10
+) -> list:
     """
     Group nearby horizontal lines into individual staff lines.
 
@@ -112,9 +108,11 @@ def group_into_staves(staff_line_positions, tolerance=15):
     return all_staves
 
 
-def remove_staff_lines(binary_image, detected_lines_mask):
+def remove_staff_lines(
+    binary_image: cv2.typing.MatLike, detected_lines_mask: cv2.typing.MatLike
+) -> cv2.typing.MatLike:
     """Remove detected staff lines using inpainting."""
-    no_staff = cv2.inpaint(
+    no_staff: cv2.typing.MatLike = cv2.inpaint(
         binary_image,
         detected_lines_mask,
         inpaintRadius=INPAINT_RADIUS,
@@ -124,7 +122,10 @@ def remove_staff_lines(binary_image, detected_lines_mask):
 
 
 def segment_staves(
-    binary_image, detected_lines_mask, spacing_threshold=10, tolerance=15
+    binary_image: cv2.typing.MatLike,
+    detected_lines_mask: cv2.typing.MatLike,
+    spacing_threshold=10,
+    tolerance=15,
 ):
     """
     Get individual staff regions from the full image.
@@ -149,7 +150,7 @@ def segment_staves(
     return staff_regions
 
 
-def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
+def segment_music_sheet(image: cv2.typing.MatLike, spacing_threshold=10, tolerance=15):
     """
     Run the full segmentation pipeline on a sheet music image.
 
@@ -169,7 +170,7 @@ def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
             staff_regions: list of original staff crops (with lines)
             staff_regions_no_lines: list of same regions after line removal
     """
-    binary = preprocess_image(img_path)
+    binary = preprocess_image(image)
     detected_lines = detect_staff_lines(binary)
     staff_regions = segment_staves(
         binary, detected_lines, spacing_threshold=spacing_threshold, tolerance=tolerance
