@@ -10,18 +10,29 @@
   <part id="P1">
   {% for measure in score.measures %}
     <measure number="{{ loop.index }}">
-      {% if loop.first %}
+
+      {% set clef = score.clef_changes.get(loop.index, None) %}
+      {% if loop.first or clef %}
       <attributes>
+        {% if loop.first %}
         <divisions>1</divisions>
         <key><fifths>0</fifths></key>
         <time>
           <beats>{{ score.time_signature.beats }}</beats>
           <beat-type>{{ score.time_signature.beat_type }}</beat-type>
         </time>
+        {% endif %}
+        {% if clef %}
         <clef>
-          <sign>{{ score.clef.value }}</sign>
+          <sign>{{ clef.value }}</sign>
           <line>2</line>
         </clef>
+        {% elif loop.first %}
+        <clef>
+          <sign>{{ score.clef_changes.get(1).value if score.clef_changes.get(1) else 'G' }}</sign>
+          <line>2</line>
+        </clef>
+        {% endif %}
       </attributes>
       {% endif %}
 
