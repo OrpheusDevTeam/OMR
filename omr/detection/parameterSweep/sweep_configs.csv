@@ -1,0 +1,2 @@
+lr,batch,epochs,imgsz
+0.001,4,100,1024

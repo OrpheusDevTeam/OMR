@@ -1,0 +1,12 @@
+{
+"training_parameters": {
+    "lr": 0.001,
+    "batch": 16,
+    "epochs": 50, 
+    "imgsz": 640,
+    "optimizer": "AdamW" 
+    },
+"model": "yolov8n.pt",
+"datasetYaml": "datasets/deepscores/ds2_dense_prepared/deep_scores.yaml",
+"gpuCount": 8
+}
