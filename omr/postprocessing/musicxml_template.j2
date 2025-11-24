@@ -8,6 +8,22 @@
     </score-part>
   </part-list>
   <part id="P1">
+  {# 
+    Duration conversion based on <divisions>
+    With <divisions>4</divisions> (4 divisions per quarter note):
+    - whole: 16
+    - half: 8
+    - quarter: 4
+    - eighth: 2
+    - 16th: 1
+  #}
+  {% set duration_map = {
+    'whole': 16,
+    'half': 8,
+    'quarter': 4,
+    'eighth': 2,
+    '16th': 1
+  } %}
   {% for measure in score.measures %}
     <measure number="{{ loop.index }}">
 
@@ -15,7 +31,7 @@
       {% if loop.first or clef %}
       <attributes>
         {% if loop.first %}
-        <divisions>1</divisions>
+        <divisions>4</divisions>
         <key><fifths>0</fifths></key>
         <time>
           <beats>{{ score.time_signature.beats }}</beats>
@@ -36,15 +52,26 @@
       </attributes>
       {% endif %}
 
-      {% for note in measure.notes %}
+      {% for item in measure.items %}
       <note>
+        {% if item.pitch is defined %}
         <pitch>
-          <step>{{ note.pitch.step }}</step>
-          <octave>{{ note.pitch.octave }}</octave>
+          <step>{{ item.pitch.step }}</step>
+          {% if item.pitch.accidental == 'sharp' %}<alter>1</alter>
+          {% elif item.pitch.accidental == 'flat' %}<alter>-1</alter>
+          {% elif item.pitch.accidental == 'natural' %}<alter>0</alter>
+          {% endif %}
+          <octave>{{ item.pitch.octave }}</octave>
         </pitch>
-        <duration>1</duration>
-        <type>{{ note.duration.value }}</type>
-        {% for _ in range(note.dots) %}
+        {% else %}
+        <rest/>
+        {% endif %}
+        <duration>{{ duration_map.get(item.duration.value, 4) }}</duration>
+        <type>{{ item.duration.value }}</type>
+        {% if item.pitch is defined and item.pitch.accidental %}
+        <accidental>{{ item.pitch.accidental }}</accidental>
+        {% endif %}
+        {% for _ in range(item.dots) %}
         <dot/>
         {% endfor %}
       </note>

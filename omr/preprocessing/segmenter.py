@@ -140,14 +140,16 @@ def segment_staves(
     all_staves = group_into_staves(staff_line_positions, tolerance)
 
     staff_regions = []
+    staves_offsets_y = []
 
     for staff_lines in all_staves:
         top_boundary = max(staff_lines[0] - STAFF_MARGIN, 0)
+        staves_offsets_y.append(top_boundary)
         bottom_boundary = min(staff_lines[-1] + STAFF_MARGIN, binary_image.shape[0])
         staff_crop = binary_image[top_boundary:bottom_boundary, :]
         staff_regions.append(staff_crop)
 
-    return staff_regions
+    return staff_regions, all_staves, staves_offsets_y
 
 
 def segment_music_sheet(image: cv2.typing.MatLike, spacing_threshold=10, tolerance=15):
@@ -169,14 +171,15 @@ def segment_music_sheet(image: cv2.typing.MatLike, spacing_threshold=10, toleran
         SegmenterOutput:
             staff_regions: list of original staff crops (with lines)
             staff_regions_no_lines: list of same regions after line removal
+            staves_coordinates: list of y-coordinates for each staff's 5 lines
     """
     binary = preprocess_image(image)
     detected_lines = detect_staff_lines(binary)
-    staff_regions = segment_staves(
+    staff_regions, staves_coordinates, staves_offsets_y = segment_staves(
         binary, detected_lines, spacing_threshold=spacing_threshold, tolerance=tolerance
     )
     no_staff = remove_staff_lines(binary, detected_lines)
-    staff_regions_no_lines = segment_staves(
+    staff_regions_no_lines, _, _ = segment_staves(
         no_staff,
         detected_lines,
         spacing_threshold=spacing_threshold,
@@ -190,4 +193,6 @@ def segment_music_sheet(image: cv2.typing.MatLike, spacing_threshold=10, toleran
         staff_regions_no_lines=[
             cv2.bitwise_not(region) for region in staff_regions_no_lines
         ],
+        staves_coordinates=staves_coordinates,
+        staves_offsets_y=staves_offsets_y,
     )

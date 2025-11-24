@@ -15,6 +15,7 @@ from omr.detection.scanner.scan import scan
 from omr.exceptions import FileFormatNotSupportedError
 from omr.image_loader import load_images
 from omr.models.detected_symbol import DetectedSymbol
+from omr.postprocessing.combine import standarize_symbols
 from omr.postprocessing.convert_to_music_xml import score_to_musicxml
 from omr.preprocessing import segmenter
 
@@ -79,19 +80,15 @@ def main(argv: List[str] | None = None) -> int:
             print("Scan results:")
             print(results)
             print("Type:", type(results))
-            for result in results:
-                # result is a list of dictionaries per staff line
-                print("Result per staff region (image segment):")
-                # print("Type:", type(result))
-                # print(json.dumps(result, indent=2))
-                detected_symbols: List[Any] = []
-                for detection in result:
-                    detected_symbol = DetectedSymbol.from_yolo_detection(detection)
-                    detected_symbols.append(detected_symbol)
+
+            segments: List[List[DetectedSymbol]] = []
+
+            for index, result in enumerate(results):
+                detected_symbols: List[DetectedSymbol] = [DetectedSymbol.from_yolo_detection(detection) for detection in result]
+                segments.append(detected_symbols)
+                logger.debug(f"Detected {len(detected_symbols)} symbols in {index} region of {path}.")
                 
-                print(f"Detected {len(detected_symbols)} symbols in this region.")
-                for symbol in detected_symbols:
-                    print(symbol)
+
 
             # 4. Post-processing (Music Score Conversion)
             # Here, the 'results' (raw detections) would be converted into a structured
@@ -100,7 +97,9 @@ def main(argv: List[str] | None = None) -> int:
 
         # FIXME, if this goes to prod, we are doomed
         
-        music_score = mock_score()
+        music_score = standarize_symbols(segments[0])
+        print(music_score)
+        #music_score = mock_score()
         xml = score_to_musicxml(music_score)
         with open("output.musicxml", "w") as file:
             file.write(xml)
