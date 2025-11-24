@@ -1,0 +1,4 @@
+{"modelPath": "/omr/detection/scanner/trained.pt",
+"default_result_dir": "/omr/detection/scanner/results/",
+"default_preprocessing_dir":"/omr/detection/scanner/preprocessing/"
+}
