@@ -29,7 +29,11 @@ def test_get_rests():
 
 def test_get_accidentals():
     acc = Symbol.get_accidentals()
-    assert {Symbol.ACCIDENTAL_SHARP, Symbol.ACCIDENTAL_FLAT, Symbol.ACCIDENTAL_NATURAL} <= set(acc)
+    assert {
+        Symbol.ACCIDENTAL_SHARP,
+        Symbol.ACCIDENTAL_FLAT,
+        Symbol.ACCIDENTAL_NATURAL,
+    } <= set(acc)
 
 
 def test_get_flags():

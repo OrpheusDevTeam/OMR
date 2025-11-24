@@ -1,12 +1,12 @@
+import inspect
 import logging
-from os import environ
 import sys
 import traceback
+from logging.handlers import RotatingFileHandler
+from os import environ
+from pathlib import Path
 from types import TracebackType
 from typing import Optional, Type, Union
-from pathlib import Path
-from logging.handlers import RotatingFileHandler
-import inspect
 
 
 class OMRLogger(logging.Logger):

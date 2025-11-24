@@ -1,7 +1,13 @@
-
 import logging
 
-from omr.models.music_note import ClefType, DurationType, LogicalNote, Measure, MusicScore, Pitch
+from omr.models.music_note import (
+    ClefType,
+    DurationType,
+    LogicalNote,
+    Measure,
+    MusicScore,
+    Pitch,
+)
 
 
 def mock_score():
@@ -9,7 +15,7 @@ def mock_score():
     logger.warning("Using mock score!")
     measures = [
         Measure(
-            notes = [
+            notes=[
                 LogicalNote(
                     pitch=Pitch(step="A", octave=4), duration=DurationType.WHOLE
                 ),
@@ -22,7 +28,7 @@ def mock_score():
             ]
         ),
         Measure(
-            notes= [
+            notes=[
                 LogicalNote(
                     pitch=Pitch(step="A", octave=4), duration=DurationType.WHOLE
                 ),
@@ -38,4 +44,3 @@ def mock_score():
 
     score = MusicScore(measures=measures, clef_changes={0: ClefType.TENOR})
     return score
-

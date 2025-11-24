@@ -1,18 +1,19 @@
-import pytest
-import numpy as np
-import cv2
 from unittest.mock import patch
 
-from omr.preprocessing.segmenter import (
-    preprocess_image,
-    detect_staff_lines,
-    group_staff_lines,
-    group_into_staves,
-    remove_staff_lines,
-    segment_staves,
-    segment_music_sheet,
-)
+import cv2
+import numpy as np
+import pytest
+
 from omr.models.segmenter_output import SegmenterOutput
+from omr.preprocessing.segmenter import (
+    detect_staff_lines,
+    group_into_staves,
+    group_staff_lines,
+    preprocess_image,
+    remove_staff_lines,
+    segment_music_sheet,
+    segment_staves,
+)
 
 
 @pytest.fixture

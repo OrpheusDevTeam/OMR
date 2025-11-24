@@ -1,22 +1,16 @@
 import argparse
 import json
 import logging
-from os import environ
 import os
 import sys
-from mocker import mock_score
-from omr.image_loader import load_images
-from omr.exceptions import FileFormatNotSupportedError
-
-import argparse
-import json
-import sys
+from os import environ
 from pathlib import Path
 from typing import Any, List
 
 from logger import setup_logging
-from omr.image_loader import load_images
+from mocker import mock_score
 from omr.exceptions import FileFormatNotSupportedError
+from omr.image_loader import load_images
 from omr.postprocessing.convert_to_music_xml import score_to_musicxml
 
 EXIT_SUCCESS = 0
@@ -59,9 +53,10 @@ def main(argv: List[str] | None = None) -> int:
     try:
         images = process_paths(paths)
         # FIXME, if this goes to prod, we are doomed
+        
         music_score = mock_score()
         xml = score_to_musicxml(music_score)
-        with open('output.musicxml', 'w') as file:
+        with open("output.musicxml", "w") as file:
             file.write(xml)
             filepath = os.path.abspath(file.name)
 
@@ -126,6 +121,7 @@ def main(argv: List[str] | None = None) -> int:
             )
         )
         return EXIT_GENERIC_ERROR
+
 
 if __name__ == "__main__":
     sys.exit(main())

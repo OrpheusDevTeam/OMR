@@ -1,8 +1,10 @@
 import os
-import pytest
-import numpy as np
+
 import cv2
 import fitz
+import numpy as np
+import pytest
+
 from omr.exceptions import FileFormatNotSupportedError
 from omr.image_loader import load_images
 

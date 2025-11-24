@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from enum import StrEnum
 from typing import Dict, List, Optional
+
 from pydantic import BaseModel
 
 from omr.models.symbols import Symbol

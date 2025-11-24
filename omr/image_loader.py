@@ -1,10 +1,13 @@
 import errno
-import numpy as np
+import logging
 import os
-from omr.exceptions import FileFormatNotSupportedError
+
 import cv2
 import fitz
+import numpy as np
+
 from omr.config_loader import load_config
+from omr.exceptions import FileFormatNotSupportedError
 
 CONFIG = load_config()
 ACCEPTED_FORMATS = set(CONFIG["formats"]["supported"])

@@ -11,3 +11,7 @@ class FileFormatNotSupportedError(ValueError):
             else ""
         )
         super().__init__(message)
+
+
+class NoSymbolsDetectedError(ValueError):
+    pass
