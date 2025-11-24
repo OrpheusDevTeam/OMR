@@ -1,7 +1,9 @@
 import argparse
 import sys
 import os
+from typing import List
 import cv2
+from cv2.typing import MatLike
 import supervision as sv
 import json
 import torch
@@ -57,6 +59,78 @@ def parse_config(path):
         config[key] = BASE_PATH + config[key]
 
     return config
+
+def scan(
+    processed_images: List[MatLike], 
+    file_save: bool = False, 
+    base_path: str = os.environ.get("BASE_PATH", "."),
+    config_local: dict = None
+) -> List[List[dict]]:
+    """
+    Scans a list of pre-segmented (staff-line-removed) images for musical symbols.
+
+    Args:
+        processed_images (List[MatLike]): A list of segmented images (staff regions).
+        file_save (bool): If True, saves an annotated image for each segment.
+        base_path (str): Base directory path for configuration and result saving.
+        config (dict | None): Optional pre-loaded configuration dictionary.
+
+    Returns:
+        List[List[dict]]: A list where each inner list contains the detections 
+                          (class and bounding box) for one staff region.
+    """
+    if not config_local:
+        global BASE_PATH
+        global config
+        BASE_PATH = os.environ.get("BASE_PATH", ".")
+        config = parse_config(BASE_PATH + "/omr/detection/scanner/modelConfig.json")
+    else:
+        config = config_local
+
+    model_path = config["modelPath"]
+    default_dir = config["default_result_dir"]
+    
+    # 1. Load the YOLO Model (Done only once)
+    print("Loading YOLO model...")
+    try:
+        model = YOLO(model_path)
+    except Exception as e:
+        print(f"Error loading model from {model_path}. Ensure it exists.")
+        raise e
+
+    all_detections: List[List[dict]] = []
+    
+    # 2. Iterate and Scan Each Segmented Image
+    for i, image in enumerate(processed_images):
+        print(f"Scanning staff region {i + 1}/{len(processed_images)}...")
+        
+        # Run inference (Model Prediction)
+        results = model.predict(
+            source=image,
+            save=False,
+            device=0 if torch.cuda.is_available() else 'cpu',
+            verbose=False
+        )
+        
+        result = results[0] # Get results for the current image
+        
+        # Extract labels
+        labels_with_confidence, raw_labels = extract_labels_for_boxes(result, model)
+        
+        # Save results visually if requested
+        if file_save:
+            # Create a unique file path for the segmented image result
+            file_name = f"segment_{i}_result.png"
+            save_path = os.path.join(default_dir, file_name)
+            
+            save_file(result, labels_with_confidence, save_path)
+            print(f"Annotated result saved to: {save_path}")
+
+        # Parse and store the final structured detections
+        detections = parse_to_list(result, raw_labels)
+        all_detections.append(detections)
+
+    return all_detections
 
 def main():
     global BASE_PATH

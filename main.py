@@ -3,15 +3,20 @@ import json
 import logging
 import os
 import sys
+import cv2
+from cv2.typing import MatLike
 from os import environ
 from pathlib import Path
 from typing import Any, List
 
 from logger import setup_logging
 from mocker import mock_score
+from omr.detection.scanner.scan import scan
 from omr.exceptions import FileFormatNotSupportedError
 from omr.image_loader import load_images
+from omr.models.detected_symbol import DetectedSymbol
 from omr.postprocessing.convert_to_music_xml import score_to_musicxml
+from omr.preprocessing import segmenter
 
 EXIT_SUCCESS = 0
 EXIT_UNSUPPORTED_FORMAT = 2
@@ -23,12 +28,12 @@ setup_logging(log_level)
 logger = logging.getLogger(__name__)
 
 
-def process_paths(paths: List[str]) -> dict[str, Any]:
-    """Load images and return a structured JSON-ready result."""
+def process_paths(paths: List[str]) -> list[tuple[str, MatLike]]:
+    """Load images and return a list of materials."""
     logger.info(f"Received {len(paths)} path(s) to process.")
     images = load_images(paths)
     logger.info(f"Successfully loaded {len(images)} image(s).")
-    return images
+    return list(zip(paths, images))
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -51,7 +56,48 @@ def main(argv: List[str] | None = None) -> int:
         raise FileNotFoundError("None of the paths are valid")
 
     try:
-        images = process_paths(paths)
+        # 1. Load Image(s)
+        images_with_paths = process_paths(paths) 
+        
+        for path, image in images_with_paths:
+            logger.info(f"Starting segmentation and scanning for {path}.")
+            
+            # 2. Preprocessing: Segmentation and Staff-line Removal
+            # This returns an object that contains a list of staff region images (MatLike)
+            # which have had the staff lines removed.
+            segmented_data = segmenter.segment_music_sheet(image)
+            processed_images = segmented_data.staff_regions_no_lines
+            
+            # 3. Scanning/Detection
+            # FIXME TEMPORARY!!!!! Convert grayscale to RGB
+            # Later, the YOLO model will be trained on grayscale images directly
+            processed_images = [cv2.cvtColor(img, cv2.COLOR_GRAY2RGB) for img in processed_images]
+
+            results = scan(processed_images, True) 
+            
+            logger.info(f"Scan completed. Detected objects in {len(results)} regions.")
+            print("Scan results:")
+            print(results)
+            print("Type:", type(results))
+            for result in results:
+                # result is a list of dictionaries per staff line
+                print("Result per staff region (image segment):")
+                # print("Type:", type(result))
+                # print(json.dumps(result, indent=2))
+                detected_symbols: List[Any] = []
+                for detection in result:
+                    detected_symbol = DetectedSymbol.from_yolo_detection(detection)
+                    detected_symbols.append(detected_symbol)
+                
+                print(f"Detected {len(detected_symbols)} symbols in this region.")
+                for symbol in detected_symbols:
+                    print(symbol)
+
+            # 4. Post-processing (Music Score Conversion)
+            # Here, the 'results' (raw detections) would be converted into a structured
+            # Music Score representation before generating MusicXML.
+            # TODO: Add logic to convert 'results' (detections) into a score object.
+
         # FIXME, if this goes to prod, we are doomed
         
         music_score = mock_score()
