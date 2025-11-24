@@ -1,6 +1,7 @@
 from __future__ import annotations
+import logging
 import re
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 from omr.models.bounding_box import BoundingBox
@@ -13,7 +14,7 @@ class DetectedSymbol(BaseModel):
     bbox: BoundingBox
 
     @classmethod
-    def from_yolo_detection(cls, detection) -> DetectedSymbol:
+    def from_yolo_detection(cls, detection) -> Optional[DetectedSymbol]:
         """Creates DetectedSymbol from a YOLO detection object."""
         raw_class: str = detection["class"]  # "noteheadBlackInSpace"
         bbox: List[float] = detection["bounding_box"]  # [x1, y1, x2, y2]
@@ -27,8 +28,8 @@ class DetectedSymbol(BaseModel):
                 snake = camel_to_snake(raw_class)  # "notehead_black_in_space"
                 symbol = Symbol(snake)
             except ValueError as e:
-                raise ValueError(f"Unknown symbol class: {raw_class} → {snake}") from e
-
+                logging.getLogger(__name__).warning(f"Unknown symbol class: {raw_class} → {snake}")
+                return None
         # convert bbox
         bb: BoundingBox = BoundingBox.from_xyxy(bbox)
 

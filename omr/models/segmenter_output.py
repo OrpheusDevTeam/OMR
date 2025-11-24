@@ -9,4 +9,3 @@ class SegmenterOutput(BaseModel):
     staff_regions: List[Any]
     staff_regions_no_lines: List[Any]
     staves_coordinates: List[List[int]]
-    staves_offsets_y: List[int]

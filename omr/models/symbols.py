@@ -55,6 +55,8 @@ class Symbol(StrEnum):
     BAR_LINE = "barline"
     LEDGER_LINE = "ledgerLine"
 
+    BEAM = "beam"
+
     @classmethod
     def get_clefs(cls) -> list[Symbol]:
         return [cls.CLEF_G, cls.CLEF_F, cls.CLEF_C_ALTO, cls.CLEF_C_TENOR]

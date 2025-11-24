@@ -36,26 +36,19 @@ logger = logging.getLogger(__name__)
 
 
 def standarize_symbols(
-    detected_symbols: List[DetectedSymbol], staves_coordinates: List[int]
+    detected_symbols: List[DetectedSymbol],
+    staff_lines: List[int],
 ):
     """
     Standardize detected symbols by merging duplicates and resolving overlaps.
 
     Args:
         detected_symbols (List[DetectedSymbol]): List of detected symbols to standardize.
-        staves_coordinates (List[int]): Y-coordinates of the 5 staff lines.
 
     Returns:
     """
     if not detected_symbols:
         raise NoSymbolsDetectedError()
-
-    if environ.get("MOCK_OMR", None):
-        return MusicScore(
-            measures=mock_measures(),
-            time_signature=TimeSignature(beats=4, beat_type=4),
-            clef_changes=[],
-        )
 
     sorted_symbols = sorted(detected_symbols, key=lambda s: (s.bbox.x_center))
     
@@ -65,12 +58,12 @@ def standarize_symbols(
     grouped_symbols = group_symbols(sorted_symbols)
     logical_items = create_logical_items(
         grouped_symbols,
-        staves_coordinates=staves_coordinates,
+        staff_lines,
     )
 
     measures = split_into_measures(logical_items)
 
-    # TODO: this needs to be re-verified, as we have more than just notes
+    # TODO: this needs to be fixed properly
     # clef_changes = map_clef_changes_to_notes(clef_symbols, logical_items)
 
     score = MusicScore(
@@ -86,12 +79,12 @@ def extract_clefs(detected_symbols: List[DetectedSymbol]) -> List[DetectedSymbol
     return [s for s in detected_symbols if s.symbol_class in Symbol.get_clefs()]
 
 def find_note_index_for_clef(clef_x: float, logical_items: List[MeasureItem]) -> int:
-    # Uproszczona zasada: klucz stoi przed nutą
+    # klucz stoi przed nutą
     distances = [(i, item.x_position - clef_x) for i, item in enumerate(logical_items) if isinstance(item, LogicalNote)]
     distances = [(i, d) for i, d in distances if d >= 0]
 
     if not distances:
-        return 0  # skrajny przypadek
+        return 0
 
     return min(distances, key=lambda x: x[1])[0]
 
@@ -101,7 +94,7 @@ def map_clef_changes_to_notes(clef_symbols: list[DetectedSymbol], logical_items:
     for clef_symbol in clef_symbols:
         clef_x = clef_symbol.bbox.x_center
 
-        # Znajdź nutę logiczną najbliżej w osi X (po lewej)
+        # nuta najbliżej w osi x (po lewej)
         idx = find_note_index_for_clef(clef_x, logical_items)
 
         clef_changes[idx] = ClefType.from_symbol(clef_symbol.symbol_class)
@@ -136,7 +129,7 @@ def extract_time_signature(
 
 
 def group_symbols(symbols: List[DetectedSymbol]):
-    # Separate symbols by type
+    # separate symbols by type
     noteheads = [s for s in symbols if s.symbol_class in Symbol.get_noteheads()]
     stems = [s for s in symbols if s.symbol_class == Symbol.STEM]
     flags = [s for s in symbols if s.symbol_class in Symbol.get_flags()]
@@ -145,7 +138,6 @@ def group_symbols(symbols: List[DetectedSymbol]):
     dots = [s for s in symbols if s.symbol_class == Symbol.AUGMENTATION_DOT]
     barlines = [s for s in symbols if s.symbol_class == Symbol.BAR_LINE]
 
-    # Create KD-Trees for efficient searching of symbol accessories
     stem_points = [(s.bbox.x_center, s.bbox.y_center) for s in stems]
     flag_points = [(f.bbox.x_center, f.bbox.y_center) for f in flags]
     accidental_points = [(a.bbox.x_center, a.bbox.y_center) for a in accidentals]
@@ -155,31 +147,25 @@ def group_symbols(symbols: List[DetectedSymbol]):
     flag_tree = KDTree(flag_points) if flag_points else None
     accidental_tree = KDTree(accidental_points) if accidental_points else None
     dot_tree = KDTree(dot_points) if dot_points else None
-
-    # --- Grouping Logic ---
     
     used_indices = set()
     
-    # First, associate accessories with noteheads
     note_groups = []
     for i, nh in enumerate(noteheads):
         note_group = {"type": "note", "notehead": nh, "dots": []}
 
-        # Associate stem
         if stem_tree:
             dist, idx = stem_tree.query((nh.bbox.x_center, nh.bbox.y_center))
             if dist < nh.bbox.width * 2:
                 note_group["stem"] = stems[idx]
                 used_indices.add(("stem", idx))
                 
-                # Associate flag to the stem
                 if flag_tree:
                     dist_f, idx_f = flag_tree.query((stems[idx].bbox.x_center, stems[idx].bbox.y_top))
                     if dist_f < stems[idx].bbox.height * 1.5:
                         note_group["flag"] = flags[idx_f]
                         used_indices.add(("flag", idx_f))
 
-        # Associate accidental (must be to the left)
         if accidental_tree:
             indices = accidental_tree.query_ball_point((nh.bbox.x_center - nh.bbox.width, nh.bbox.y_center), r=nh.bbox.width*2)
             for idx in indices:
@@ -187,8 +173,7 @@ def group_symbols(symbols: List[DetectedSymbol]):
                     note_group["accidental"] = accidentals[idx]
                     used_indices.add(("accidental", idx))
                     break
-        
-        # Associate dots (must be to the right)
+
         if dot_tree:
             indices = dot_tree.query_ball_point((nh.bbox.x_center + nh.bbox.width, nh.bbox.y_center), r=nh.bbox.width*2)
             for idx in indices:
@@ -198,7 +183,6 @@ def group_symbols(symbols: List[DetectedSymbol]):
 
         note_groups.append(note_group)
 
-    # Second, associate dots with rests
     rest_groups = []
     for i, r in enumerate(rests):
         rest_group = {"type": "rest", "rest": r, "dots": []}
@@ -210,13 +194,11 @@ def group_symbols(symbols: List[DetectedSymbol]):
                     used_indices.add(("dot", idx))
         rest_groups.append(rest_group)
 
-    # Combine all groups and barlines, then sort by x_position
     all_items = note_groups + rest_groups
-    # Add barlines as their own group for sorting
+
     for b in barlines:
         all_items.append({"type": "barline", "barline": b, "x_pos": b.bbox.x_center})
 
-    # Add a sort key 'x_pos' to all items before sorting
     for item in all_items:
         if "x_pos" not in item:
             main_symbol = item.get("notehead") or item.get("rest")
@@ -227,38 +209,8 @@ def group_symbols(symbols: List[DetectedSymbol]):
     return sorted_items
 
 
-
-def mock_measures():
-    logger.warning("Using mock measures!")
-    return [
-        Measure(
-            items=[
-                LogicalNote(
-                    pitch=Pitch(step="A", octave=4), duration=DurationType.WHOLE
-                ),
-                LogicalRest(duration=DurationType.QUARTER),
-                LogicalNote(
-                    pitch=Pitch(step="G", octave=5), duration=DurationType.HALF
-                ),
-            ]
-        ),
-        Measure(
-            items=[
-                LogicalNote(
-                    pitch=Pitch(step="A", octave=4), duration=DurationType.WHOLE
-                ),
-                LogicalNote(
-                    pitch=Pitch(step="C", octave=4), duration=DurationType.WHOLE
-                ),
-                LogicalRest(duration=DurationType.EIGHTH),
-            ]
-        ),
-    ]
-
-
-
 ###############################################################################
-# NOTEHEAD + STEM + FLAG / REST → DURATION
+# NOTEHEAD + STEM + FLAG / REST to DURATION
 ###############################################################################
 
 NOTEHEAD_TO_BASE_DURATION = {
@@ -303,11 +255,12 @@ def duration_from_components(item_symbol: Symbol, flag: Optional[Symbol]) -> Dur
     raise ValueError(f"Unsupported symbol for duration: {item_symbol}")
 
 ###############################################################################
-# NOTEHEAD POSITION → PITCH
+# POSITION to PITCH ;-;
 ###############################################################################
 
 # Maps staff line position index to pitch (for treble clef)
 # Index 0 is the top line (F5), 1 is the space above (G5), etc.
+# FIXME: Make this more flexible for different clefs and less hardcoded
 TREBLE_CLEF_PITCH_MAP = {
     -2: ("C", 6),  # Ledger line above
     -1: ("B", 5),
@@ -324,6 +277,13 @@ TREBLE_CLEF_PITCH_MAP = {
     10: ("E", 4),  # Bottom staff line
     11: ("D", 4),
     12: ("C", 4), # Ledger line below
+    13: ("B", 3),
+    14: ("A", 3),
+    15: ("G", 3),
+    16: ("F", 3),
+    17: ("E", 3),
+    18: ("D", 3),
+
 }
 
 
@@ -335,24 +295,29 @@ def pitch_from_y(y_center: float, staves_coordinates: List[int]) -> Pitch:
     if len(staves_coordinates) != 5:
         raise ValueError("Must provide coordinates for all 5 staff lines.")
 
-    # Sort coordinates just in case they aren't
+    # top-to-bottom, as y increases downward
     staves_coordinates.sort()
 
     staff_line_distance = (staves_coordinates[-1] - staves_coordinates[0]) / 4
     half_line_distance = staff_line_distance / 2
 
-    # Find the closest staff line or space
-    # We use the bottom staff line (E4) as the reference point (index 10)
+    # y-coord of the bottom staff line (index 10 in map)
     reference_y = staves_coordinates[4]
-    
-    # Calculate the number of half-steps from the reference line
-    vertical_offset = (reference_y - y_center)
+
+    # number of half-steps (lines/spaces) from the reference line (y-center moves up)
+    # vertical_offset is positive if the note is above the reference_y (lower Y-coordinate)
+    # at least it should be
+    vertical_offset = (y_center - reference_y)
+
+    # position_index: magical number of half-steps from the reference line (index 10)
     position_index = round(vertical_offset / half_line_distance) + 10
 
-    # Look up the pitch in the map
     step, octave = TREBLE_CLEF_PITCH_MAP.get(
         position_index, ("C", 4)
-    )  # Default to C4 if out of range
+    )
+
+    print("Y center: " + str(y_center))
+    print("Position index: " + str(position_index))
 
     return Pitch(step=step, octave=octave)
 
@@ -363,7 +328,7 @@ def pitch_from_y(y_center: float, staves_coordinates: List[int]) -> Pitch:
 
 def create_logical_items(grouped_symbols: List[Dict], staves_coordinates: List[int]) -> List[Union[MeasureItem, DetectedSymbol]]:
     logical_items = []
-
+    print("Staves coordinates for pitch calculation:", staves_coordinates)
     for item in grouped_symbols:
         item_type = item.get("type")
         
@@ -405,7 +370,7 @@ def create_logical_items(grouped_symbols: List[Dict], staves_coordinates: List[i
     return logical_items
 
 ###############################################################################
-# GROUP INTO MEASURES
+# GROUP INTO ACTUAL MEASURES
 ###############################################################################
 
 def split_into_measures(logical_items: List[Union[MeasureItem, DetectedSymbol]]) -> List[Measure]:
