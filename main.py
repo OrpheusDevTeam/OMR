@@ -59,12 +59,12 @@ def main(argv: List[str] | None = None) -> int:
 
     try:
         # 1. Load Image(s)
-        images_with_paths = process_paths(paths) 
-        
+        images_with_paths = process_paths(paths)
+
         for path, image in images_with_paths:
             logger.info(f"Starting segmentation and scanning for {path}.")
             image = straighten_picture(image)
-            
+
             # 2. Preprocessing:
             # This returns an object that contains a list of staff region images (MatLike)
             # which have had the staff lines removed.
@@ -72,40 +72,47 @@ def main(argv: List[str] | None = None) -> int:
 
             staves_coords = segmented_data.staves_coordinates
             processed_images = segmented_data.staff_regions_no_lines
-            
+
             # 3. Scanning/Detection
             # FIXME TEMPORARY!!!!! Convert grayscale to RGB
             # Later, the YOLO model will be trained on grayscale images directly
-            processed_images = [cv2.cvtColor(img, cv2.COLOR_GRAY2RGB) for img in processed_images]
+            processed_images = [
+                cv2.cvtColor(img, cv2.COLOR_GRAY2RGB) for img in processed_images
+            ]
 
-            results = scan(processed_images, True) 
-            
+            results = scan(processed_images, True)
+
             logger.info(f"Scan completed. Detected objects in {len(results)} regions.")
 
             segments: List[List[DetectedSymbol]] = []
 
             for index, result in enumerate(results):
                 detected_symbols = [
-                    sym for sym in
-                    (DetectedSymbol.from_yolo_detection(d) for d in result)
+                    sym
+                    for sym in (DetectedSymbol.from_yolo_detection(d) for d in result)
                     if sym is not None
                 ]
                 segments.append(detected_symbols)
-                logger.debug(f"Detected {len(detected_symbols)} symbols in {index} region of {path}.")
+                logger.debug(
+                    f"Detected {len(detected_symbols)} symbols in {index} region of {path}."
+                )
 
         music_scores = []
-        
+
         if len(segments) != len(staves_coords):
-             logger.error("Mismatch between number of staff segments and coordinate lists.")
-             
-        for i, (segment_symbols, staff_coords) in enumerate(zip(segments, staves_coords)):
+            logger.error(
+                "Mismatch between number of staff segments and coordinate lists."
+            )
+
+        for i, (segment_symbols, staff_coords) in enumerate(
+            zip(segments, staves_coords)
+        ):
             if not segment_symbols:
                 logger.warning(f"Segment {i} has no symbols, skipping.")
                 continue
-            
+
             music_score_segment = standarize_symbols(
-                segment_symbols, 
-                staff_lines=staff_coords
+                segment_symbols, staff_lines=staff_coords
             )
             music_scores.append(music_score_segment)
 
@@ -120,7 +127,6 @@ def main(argv: List[str] | None = None) -> int:
         else:
             # TODO Handle case with no scores
             filepath = ""
-
 
         print(
             json.dumps(

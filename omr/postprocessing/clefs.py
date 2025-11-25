@@ -8,7 +8,10 @@ from omr.postprocessing.constants import TIME_SIG_DIGIT_MAP
 
 logger = logging.getLogger(__name__)
 
-def extract_time_signature(detected_symbols: List[DetectedSymbol]) -> Optional[TimeSignature]:
+
+def extract_time_signature(
+    detected_symbols: List[DetectedSymbol],
+) -> Optional[TimeSignature]:
     """Detects time signature from symbols."""
     # Common / Cut time
     if any(s.symbol_class == Symbol.TIME_SIG_COMMON for s in detected_symbols):
@@ -20,7 +23,7 @@ def extract_time_signature(detected_symbols: List[DetectedSymbol]) -> Optional[T
     digits = []
     # sort vertically to find top/bottom numbers
     sorted_syms = sorted(detected_symbols, key=lambda s: s.bbox.y_center)
-    
+
     for s in sorted_syms:
         if s.symbol_class in TIME_SIG_DIGIT_MAP:
             digits.append(TIME_SIG_DIGIT_MAP[s.symbol_class])
@@ -38,8 +41,7 @@ def extract_clefs(detected_symbols: List[DetectedSymbol]) -> List[DetectedSymbol
 
 
 def map_clef_changes_to_notes(
-    clef_symbols: List[DetectedSymbol], 
-    logical_items: List[MeasureItem]
+    clef_symbols: List[DetectedSymbol], logical_items: List[MeasureItem]
 ) -> Dict[int, ClefType]:
     """
     Map clef symbols to indices of LogicalNotes.
@@ -51,16 +53,22 @@ def map_clef_changes_to_notes(
     for clef_symbol in clef_symbols:
         clef_x = clef_symbol.bbox.x_center
         idx = _find_note_index_for_clef(clef_x, logical_items)
-        
+
         if idx is None:
-            logger.debug("Skipping clef at x=%s: no following LogicalNote found.", clef_x)
+            logger.debug(
+                "Skipping clef at x=%s: no following LogicalNote found.", clef_x
+            )
             continue
 
         try:
             clef_type = ClefType.from_symbol(clef_symbol.symbol_class)
         except Exception as e:
-            logger.warning("Unknown clef symbol '%s' at x=%s: %s", 
-                           clef_symbol.symbol_class, clef_x, e)
+            logger.warning(
+                "Unknown clef symbol '%s' at x=%s: %s",
+                clef_symbol.symbol_class,
+                clef_x,
+                e,
+            )
             continue
 
         if idx in clef_changes:
@@ -72,7 +80,9 @@ def map_clef_changes_to_notes(
     return clef_changes
 
 
-def _find_note_index_for_clef(clef_x: float, logical_items: List[MeasureItem]) -> Optional[int]:
+def _find_note_index_for_clef(
+    clef_x: float, logical_items: List[MeasureItem]
+) -> Optional[int]:
     """Finds the index of the first note to the right of the clef."""
     # filter only notes and calculate distances
     valid_distances = []

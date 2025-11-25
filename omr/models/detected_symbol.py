@@ -28,8 +28,4 @@ class DetectedSymbol(BaseModel):
         bb: BoundingBox = BoundingBox.from_xyxy(bbox)
 
         # confidence with default, maybe later change to get from detection
-        return cls(
-                symbol_class=symbol,
-                confidence=1.0,
-                bbox=bb
-        )
+        return cls(symbol_class=symbol, confidence=1.0, bbox=bb)

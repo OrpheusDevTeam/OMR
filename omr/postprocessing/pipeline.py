@@ -31,7 +31,7 @@ def standarize_symbols(
 
     # 1. pre-sort symbols by X position
     sorted_symbols = sorted(detected_symbols, key=lambda s: s.bbox.x_center)
-    
+
     # 2. extract global metadata (clefs, time sigsnatures)
     clef_symbols = clefs.extract_clefs(sorted_symbols)
     time_signature = clefs.extract_time_signature(sorted_symbols)
@@ -51,15 +51,14 @@ def standarize_symbols(
     score = MusicScore(
         measures=measures,
         time_signature=time_signature or TimeSignature(beats=4, beat_type=4),
-        clef_changes=clef_changes
+        clef_changes=clef_changes,
     )
 
     return score
 
 
 def _convert_groups_to_logical_items(
-    groups: List[grouping.SymbolGroup], 
-    staff_lines: List[int]
+    groups: List[grouping.SymbolGroup], staff_lines: List[int]
 ) -> List[MeasureItem]:
     """Converts intermediate SymbolGroups into LogicalNotes, LogicalRests, etc."""
     logical_items = []
@@ -68,31 +67,35 @@ def _convert_groups_to_logical_items(
         if group.group_type == "note":
             nh = group.main_symbol
             flag_sym = group.flag.symbol_class if group.flag else None
-            
+
             # duration
             duration = interpretation.calculate_duration(nh.symbol_class, flag_sym)
-            
+
             # pitch
             pitch = interpretation.calculate_pitch(nh.bbox.y_center, staff_lines)
             if group.accidental:
                 pitch.accidental = ACCIDENTAL_MAP.get(group.accidental.symbol_class)
 
-            logical_items.append(LogicalNote(
-                pitch=pitch,
-                duration=duration,
-                dots=len(group.dots),
-                x_position=nh.bbox.x_center,
-            ))
+            logical_items.append(
+                LogicalNote(
+                    pitch=pitch,
+                    duration=duration,
+                    dots=len(group.dots),
+                    x_position=nh.bbox.x_center,
+                )
+            )
 
         elif group.group_type == "rest":
             rest_sym = group.main_symbol
             duration = interpretation.calculate_duration(rest_sym.symbol_class)
-            
-            logical_items.append(LogicalRest(
-                duration=duration,
-                dots=len(group.dots),
-                x_position=rest_sym.bbox.x_center
-            ))
+
+            logical_items.append(
+                LogicalRest(
+                    duration=duration,
+                    dots=len(group.dots),
+                    x_position=rest_sym.bbox.x_center,
+                )
+            )
 
         elif group.group_type == str(Symbol.BAR_LINE):
             logical_items.append(group.main_symbol)
@@ -112,9 +115,9 @@ def _split_into_measures(logical_items: List[MeasureItem]) -> List[Measure]:
             current_measure_items = []
         elif isinstance(item, (LogicalNote, LogicalRest)):
             current_measure_items.append(item)
-    
+
     # Append the last measure if it has content
     if current_measure_items:
         measures.append(Measure(items=current_measure_items))
-        
+
     return measures

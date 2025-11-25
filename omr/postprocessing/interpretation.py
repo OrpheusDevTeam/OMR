@@ -8,14 +8,17 @@ from omr.postprocessing.constants import (
     TREBLE_CLEF_PITCH_MAP,
 )
 
-def calculate_duration(item_symbol: str, flag_symbol: Optional[str] = None) -> DurationType:
+
+def calculate_duration(
+    item_symbol: str, flag_symbol: Optional[str] = None
+) -> DurationType:
     """Infer duration based on notehead/rest and optional flag symbol."""
     if item_symbol in NOTEHEAD_TO_BASE_DURATION:
         base = NOTEHEAD_TO_BASE_DURATION[item_symbol]
         if flag_symbol is None:
             return base
         return FLAG_TO_DURATION.get(flag_symbol, base)
-    
+
     if item_symbol in REST_TO_DURATION:
         return REST_TO_DURATION[item_symbol]
 
@@ -35,7 +38,7 @@ def calculate_pitch(y_center: float, staff_lines: List[int]) -> Pitch:
 
     staff_line_dist = (sorted_lines[-1] - sorted_lines[0]) / 4
     half_line_dist = staff_line_dist / 2
-    
+
     # Reference: bottom staff line
     reference_y = sorted_lines[4]
     vertical_offset = y_center - reference_y

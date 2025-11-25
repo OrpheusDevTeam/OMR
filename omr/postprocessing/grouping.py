@@ -6,9 +6,11 @@ from scipy.spatial import KDTree
 from omr.models.detected_symbol import DetectedSymbol
 from omr.models.symbols import Symbol
 
+
 @dataclass
 class SymbolGroup:
     """Intermediate representation of grouped raw symbols."""
+
     group_type: str  # 'note', 'rest', or 'barline'
     main_symbol: Union[DetectedSymbol, None] = None  # The notehead, rest, or barline
     stem: Optional[DetectedSymbol] = None
@@ -20,6 +22,7 @@ class SymbolGroup:
     def __post_init__(self):
         if self.main_symbol:
             self.x_pos = self.main_symbol.bbox.x_center
+
 
 def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
     """
@@ -39,7 +42,7 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
     flag_tree = _build_tree(flags)
     accidental_tree = _build_tree(accidentals)
     dot_tree = _build_tree(dots)
-    
+
     used_indices = set()
     groups: List[SymbolGroup] = []
 
@@ -53,10 +56,12 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
             if dist < nh.bbox.width * 2:
                 group.stem = stems[idx]
                 used_indices.add(("stem", idx))
-                
+
                 # associate flag (attached to stem)
                 if flag_tree:
-                    dist_f, idx_f = flag_tree.query((stems[idx].bbox.x_center, stems[idx].bbox.y_top))
+                    dist_f, idx_f = flag_tree.query(
+                        (stems[idx].bbox.x_center, stems[idx].bbox.y_top)
+                    )
                     if dist_f < stems[idx].bbox.height * 1.5:
                         group.flag = flags[idx_f]
                         used_indices.add(("flag", idx_f))
@@ -64,8 +69,8 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
         # associate accidental (lft of notehead)
         if accidental_tree:
             indices = accidental_tree.query_ball_point(
-                (nh.bbox.x_center - nh.bbox.width, nh.bbox.y_center), 
-                r=nh.bbox.width * 2
+                (nh.bbox.x_center - nh.bbox.width, nh.bbox.y_center),
+                r=nh.bbox.width * 2,
             )
             for idx in indices:
                 if accidentals[idx].bbox.x_center < nh.bbox.x_center:
@@ -76,11 +81,11 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
         # associate dots (right of notehead)
         if dot_tree:
             indices = dot_tree.query_ball_point(
-                (nh.bbox.x_center + nh.bbox.width, nh.bbox.y_center), 
-                r=nh.bbox.width * 2
+                (nh.bbox.x_center + nh.bbox.width, nh.bbox.y_center),
+                r=nh.bbox.width * 2,
             )
             for idx in indices:
-                 if dots[idx].bbox.x_center > nh.bbox.x_center:
+                if dots[idx].bbox.x_center > nh.bbox.x_center:
                     group.dots.append(dots[idx])
                     used_indices.add(("dot", idx))
 
@@ -89,11 +94,10 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
     # process rests
     for r in rests:
         group = SymbolGroup(group_type="rest", main_symbol=r)
-        
+
         if dot_tree:
             indices = dot_tree.query_ball_point(
-                (r.bbox.x_center + r.bbox.width, r.bbox.y_center), 
-                r=r.bbox.width * 2
+                (r.bbox.x_center + r.bbox.width, r.bbox.y_center), r=r.bbox.width * 2
             )
             for idx in indices:
                 if ("dot", idx) not in used_indices:
@@ -107,6 +111,7 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
 
     # sort by x position
     return sorted(groups, key=lambda x: x.x_pos)
+
 
 def _build_tree(symbols: List[DetectedSymbol]) -> Optional[KDTree]:
     """Helper to safely build a KDTree from symbol centers."""

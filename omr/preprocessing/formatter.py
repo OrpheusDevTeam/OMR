@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from cv2.typing import MatLike
 
+
 def straighten_picture(image: MatLike):
     # jeśli obraz ma shape (H, W, 1)
     if len(image.shape) == 3 and image.shape[2] == 1:

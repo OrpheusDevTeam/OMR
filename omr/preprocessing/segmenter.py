@@ -87,8 +87,10 @@ def group_into_staves(staff_line_positions, tolerance=None):
     if not staff_line_positions:
         logger.warning("No staff line positions to group into staves.")
         return []
-    
-    if tolerance is None and len(staff_line_positions) > 1: # tolerance based on average spacing
+
+    if (
+        tolerance is None and len(staff_line_positions) > 1
+    ):  # tolerance based on average spacing
         diffs = np.diff(staff_line_positions)
         avg_diff = np.mean(diffs)
         tolerance = int(avg_diff * 1.3)
@@ -129,6 +131,7 @@ def remove_staff_lines(binary_image, detected_lines_mask):
     )
     return no_staff
 
+
 def compute_inter_staff_margins(all_staves):
     margins = []
     for i in range(len(all_staves) - 1):
@@ -158,7 +161,7 @@ def segment_staves(
 
     staff_regions = []
     for i, staff_lines in enumerate(all_staves):
-        if(len(inter_margins) <= 1):
+        if len(inter_margins) <= 1:
             margin_top = 10
             margin_bottom = 10
         else:
@@ -178,7 +181,6 @@ def segment_staves(
 
         crop = binary_image[top_boundary:bottom_boundary, :]
         staff_regions.append((crop, [y - top_boundary for y in staff_lines]))
-
 
     return [r[0] for r in staff_regions], [r[1] for r in staff_regions]
 
@@ -223,5 +225,5 @@ def segment_music_sheet(image, spacing_threshold=10, tolerance=15):
         staff_regions_no_lines=[
             cv2.bitwise_not(region) for region in staff_regions_no_lines
         ],
-        staves_coordinates=all_staves
+        staves_coordinates=all_staves,
     )
