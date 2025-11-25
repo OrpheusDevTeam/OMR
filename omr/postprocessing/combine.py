@@ -64,12 +64,12 @@ def standarize_symbols(
     measures = split_into_measures(logical_items)
 
     # TODO: this needs to be fixed properly
-    # clef_changes = map_clef_changes_to_notes(clef_symbols, logical_items)
+    clef_changes = map_clef_changes_to_notes(clef_symbols, logical_items)
 
     score = MusicScore(
         measures=measures,
         time_signature=time_signature or TimeSignature(beats=4, beat_type=4),
-        clef_changes={} #clef_changes
+        clef_changes=clef_changes
     )
 
     return score
@@ -78,26 +78,50 @@ def standarize_symbols(
 def extract_clefs(detected_symbols: List[DetectedSymbol]) -> List[DetectedSymbol]:
     return [s for s in detected_symbols if s.symbol_class in Symbol.get_clefs()]
 
-def find_note_index_for_clef(clef_x: float, logical_items: List[MeasureItem]) -> int:
+def find_note_index_for_clef(clef_x: float, logical_items: List[MeasureItem]) -> Optional[int]:
     # klucz stoi przed nutą
     distances = [(i, item.x_position - clef_x) for i, item in enumerate(logical_items) if isinstance(item, LogicalNote)]
     distances = [(i, d) for i, d in distances if d >= 0]
 
     if not distances:
-        return 0
+        return None
 
     return min(distances, key=lambda x: x[1])[0]
 
-def map_clef_changes_to_notes(clef_symbols: list[DetectedSymbol], logical_items: list[MeasureItem]) -> Dict[int, ClefType]:
+
+def map_clef_changes_to_notes(clef_symbols: List[DetectedSymbol], logical_items: List[MeasureItem]) -> Dict[int, ClefType]:
+    """
+    Map clef symbols to indices of logical_items (only LogicalNote indices).
+    Only create a mapping when a valid target note exists to the right of the clef.
+    """
     clef_changes: Dict[int, ClefType] = {}
 
+    if not clef_symbols:
+        return clef_changes
+
+    # create a list of logical items to preserve their original indices
+    # (we rely on find_note_index_for_clef filtering LogicalNote instances)
     for clef_symbol in clef_symbols:
         clef_x = clef_symbol.bbox.x_center
 
-        # nuta najbliżej w osi x (po lewej)
         idx = find_note_index_for_clef(clef_x, logical_items)
+        if idx is None:
+            # no note to the right of this clef -> skip mapping (prevents nonexistent changes)
+            logger.debug("Skipping clef at x=%s: no following LogicalNote found.", clef_x)
+            continue
 
-        clef_changes[idx] = ClefType.from_symbol(clef_symbol.symbol_class)
+        try:
+            clef_type = ClefType.from_symbol(clef_symbol.symbol_class)
+        except Exception as e:
+            logger.warning("Unknown clef symbol '%s' at x=%s: %s", clef_symbol.symbol_class, clef_x, e)
+            continue
+
+        # avoid overwriting an already mapped clef unless the new one is earlier (closer)
+        if idx in clef_changes:
+            logger.debug("Clef change for index %s already exists, keeping first occurrence.", idx)
+            continue
+
+        clef_changes[idx] = clef_type
 
     return clef_changes
 
@@ -120,6 +144,7 @@ def extract_time_signature(
             digits.append(TIME_SIG_DIGIT_MAP[s.symbol_class])
 
     if len(digits) >= 2:
+        logger.debug(f"Detected time signature digits: {digits[0]}/{digits[1]}")
         return TimeSignature(beats=digits[0], beat_type=digits[1])
 
     logger.warning("No time signature found.")
@@ -315,10 +340,6 @@ def pitch_from_y(y_center: float, staves_coordinates: List[int]) -> Pitch:
     step, octave = TREBLE_CLEF_PITCH_MAP.get(
         position_index, ("C", 4)
     )
-
-    print("Y center: " + str(y_center))
-    print("Position index: " + str(position_index))
-
     return Pitch(step=step, octave=octave)
 
 
@@ -328,7 +349,7 @@ def pitch_from_y(y_center: float, staves_coordinates: List[int]) -> Pitch:
 
 def create_logical_items(grouped_symbols: List[Dict], staves_coordinates: List[int]) -> List[Union[MeasureItem, DetectedSymbol]]:
     logical_items = []
-    print("Staves coordinates for pitch calculation:", staves_coordinates)
+    
     for item in grouped_symbols:
         item_type = item.get("type")
         
