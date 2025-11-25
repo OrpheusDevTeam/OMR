@@ -79,9 +79,6 @@ def main(argv: List[str] | None = None) -> int:
             results = scan(processed_images, True) 
             
             logger.info(f"Scan completed. Detected objects in {len(results)} regions.")
-            print("Scan results:")
-            print(results)
-            print("Type:", type(results))
 
             segments: List[List[DetectedSymbol]] = []
 
@@ -114,7 +111,6 @@ def main(argv: List[str] | None = None) -> int:
         # TODO: Combine scores from all segments
         if music_scores:
             music_score = music_scores[0]
-            print(music_score)
             xml = score_to_musicxml(music_score)
             with open("output.musicxml", "w") as file:
                 file.write(xml)

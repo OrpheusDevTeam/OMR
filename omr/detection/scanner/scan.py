@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 import os
 from typing import List
@@ -90,21 +91,22 @@ def scan(
     model_path = config["modelPath"]
     default_dir = config["default_result_dir"]
     
+    logger = logging.getLogger(__name__)
+
     # 1. Load the YOLO Model (Done only once)
-    print("Loading YOLO model...")
+    logger.debug("Loading YOLO model...")
     try:
         model = YOLO(model_path)
     except Exception as e:
-        print(f"Error loading model from {model_path}. Ensure it exists.")
+        logger.error(f"Error loading model from {model_path}. Ensure it exists.")
         raise e
 
     all_detections: List[List[dict]] = []
     
     # 2. Iterate and Scan Each Segmented Image
     for i, image in enumerate(processed_images):
-        print(f"Scanning staff region {i + 1}/{len(processed_images)}...")
+        logger.debug(f"Scanning staff region {i + 1}/{len(processed_images)}...")
         
-        # Run inference (Model Prediction)
         results = model.predict(
             source=image,
             save=False,
@@ -124,7 +126,7 @@ def scan(
             save_path = os.path.join(default_dir, file_name)
             
             save_file(result, labels_with_confidence, save_path)
-            print(f"Annotated result saved to: {save_path}")
+            logger.info(f"Annotated result saved to: {save_path}")
 
         # Parse and store the final structured detections
         detections = parse_to_list(result, raw_labels)
