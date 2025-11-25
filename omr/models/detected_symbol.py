@@ -19,17 +19,11 @@ class DetectedSymbol(BaseModel):
         raw_class: str = detection["class"]  # "noteheadBlackInSpace"
         bbox: List[float] = detection["bounding_box"]  # [x1, y1, x2, y2]
 
-        try:
+        if raw_class in Symbol:
             symbol = Symbol(raw_class)
-        except ValueError:
-            # if YOLO produced a class name we did not define in the enum, we try to convert it
-            # to snake_case and map again
-            try:
-                snake = camel_to_snake(raw_class)  # "notehead_black_in_space"
-                symbol = Symbol(snake)
-            except ValueError as e:
-                logging.getLogger(__name__).warning(f"Unknown symbol class: {raw_class} → {snake}")
-                return None
+        else:
+            return None
+
         # convert bbox
         bb: BoundingBox = BoundingBox.from_xyxy(bbox)
 
@@ -39,8 +33,3 @@ class DetectedSymbol(BaseModel):
                 confidence=1.0,
                 bbox=bb
         )
-        
-def camel_to_snake(name: str) -> str:
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
-    return s2.lower()
