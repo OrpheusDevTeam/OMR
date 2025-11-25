@@ -18,6 +18,7 @@ from omr.models.detected_symbol import DetectedSymbol
 from omr.postprocessing.combine import standarize_symbols
 from omr.postprocessing.convert_to_music_xml import score_to_musicxml
 from omr.preprocessing import segmenter
+from omr.preprocessing.formatter import straighten_picture
 
 EXIT_SUCCESS = 0
 EXIT_UNSUPPORTED_FORMAT = 2
@@ -62,6 +63,7 @@ def main(argv: List[str] | None = None) -> int:
         
         for path, image in images_with_paths:
             logger.info(f"Starting segmentation and scanning for {path}.")
+            image = straighten_picture(image)
             
             # 2. Preprocessing:
             # This returns an object that contains a list of staff region images (MatLike)
