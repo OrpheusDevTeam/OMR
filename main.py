@@ -15,7 +15,7 @@ from omr.detection.scanner.scan import scan
 from omr.exceptions import FileFormatNotSupportedError
 from omr.image_loader import load_images
 from omr.models.detected_symbol import DetectedSymbol
-from omr.postprocessing.combine import standarize_symbols
+from omr.postprocessing.pipeline import standarize_symbols
 from omr.postprocessing.convert_to_music_xml import score_to_musicxml
 from omr.preprocessing import segmenter
 from omr.preprocessing.formatter import straighten_picture
