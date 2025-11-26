@@ -53,7 +53,7 @@ class Symbol(StrEnum):
     REST_8TH = "rest8th"
     REST_16TH = "rest16th"
 
-    BAR_LINE = "barLine"
+    BAR_LINE = "barline"
     LEDGER_LINE = "ledgerLine"
 
     BEAM = "beam"

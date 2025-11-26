@@ -2,6 +2,7 @@ import logging
 from typing import List, Union
 
 from omr.exceptions import NoSymbolsDetectedError
+from omr.models.bounding_box import BoundingBox
 from omr.models.detected_symbol import DetectedSymbol
 from omr.models.music_note import (
     LogicalNote,
@@ -14,6 +15,7 @@ from omr.models.music_note import (
 from omr.models.symbols import Symbol
 from omr.postprocessing import clefs, grouping, interpretation
 from omr.postprocessing.constants import ACCIDENTAL_MAP
+from omr.postprocessing.barlines import extract_barlines
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 def standarize_symbols(
     detected_symbols: List[DetectedSymbol],
     staff_lines: List[int],
+    original_grayscale_image=None,
 ) -> MusicScore:
     """
     Standardize detected symbols by merging duplicates, resolving overlaps,
@@ -31,6 +34,24 @@ def standarize_symbols(
 
     # 1. pre-sort symbols by X position
     sorted_symbols = sorted(detected_symbols, key=lambda s: s.bbox.x_center)
+
+    # extract barlines first
+    if original_grayscale_image is not None:
+        barline_boxes = extract_barlines(original_grayscale_image, staff_lines)
+        detected_barlines = []
+        for x, y, w, h in barline_boxes:
+            x1, y1 = x, y
+            x2, y2 = x + w, y + h
+
+            bbox = BoundingBox.from_xyxy([x1, y1, x2, y2])
+
+            detected_barlines.append(
+                DetectedSymbol(symbol_class=Symbol.BAR_LINE, bbox=bbox, confidence=1.0)
+            )
+
+        sorted_symbols = sorted(
+            detected_symbols + detected_barlines, key=lambda s: s.bbox.x_center
+        )
 
     # 2. extract global metadata (clefs, time sigsnatures)
     clef_symbols = clefs.extract_clefs(sorted_symbols)
