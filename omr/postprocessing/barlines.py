@@ -4,8 +4,6 @@ import cv2
 
 def extract_barlines(gray, staff_lines):
     try:
-        print(staff_lines)
-
         # normalize to grayscale
         if gray is None:
             return []
@@ -44,7 +42,7 @@ def extract_barlines(gray, staff_lines):
         for cnt in contours:
             x, y, w, h = cv2.boundingRect(cnt)
 
-            if h > spacing * 4:
+            if h > spacing * 3:
                 logging.getLogger(__name__).debug(
                     f"Detected barline at x={x}, y={y + top}, w={w}, h={h}"
                 )
@@ -54,5 +52,5 @@ def extract_barlines(gray, staff_lines):
         return result[1:]  # skip first barline
 
     except Exception as ex:
-        print("barline_extract_error:", ex)
+        logging.getLogger(__name__).error("barline_extract_error:", ex)
         return []

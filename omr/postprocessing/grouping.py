@@ -30,6 +30,8 @@ def group_symbols(symbols: List[DetectedSymbol]) -> List[SymbolGroup]:
     """
     # segregate symbols by type
     noteheads = [s for s in symbols if s.symbol_class in Symbol.get_noteheads()]
+    noteheads = _merge_overlapping_noteheads(noteheads, tolerance=3)
+
     stems = [s for s in symbols if s.symbol_class == Symbol.STEM]
     flags = [s for s in symbols if s.symbol_class in Symbol.get_flags()]
     rests = [s for s in symbols if s.symbol_class in Symbol.get_rests()]
@@ -119,3 +121,40 @@ def _build_tree(symbols: List[DetectedSymbol]) -> Optional[KDTree]:
         return None
     points = [(s.bbox.x_center, s.bbox.y_center) for s in symbols]
     return KDTree(points)
+
+def _merge_overlapping_noteheads(noteheads, tolerance=3):
+    merged = []
+    used = set()
+
+    for i, nh in enumerate(noteheads):
+        if i in used:
+            continue
+
+        cluster = [nh]
+        for j, nh2 in enumerate(noteheads):
+            if j == i or j in used:
+                continue
+
+            dx = abs(nh.bbox.x_center - nh2.bbox.x_center)
+            dy = abs(nh.bbox.y_center - nh2.bbox.y_center)
+
+            if dx <= tolerance and dy <= tolerance:
+                cluster.append(nh2)
+                used.add(j)
+
+        # pick the "representative"
+        if len(cluster) == 1:
+            merged.append(cluster[0])
+        else:
+            # average bounding box center
+            x = sum(c.bbox.x_center for c in cluster) / len(cluster)
+            y = sum(c.bbox.y_center for c in cluster) / len(cluster)
+
+            rep = cluster[0]
+            rep.bbox.x_center = x
+            rep.bbox.y_center = y
+            merged.append(rep)
+
+        used.add(i)
+
+    return merged

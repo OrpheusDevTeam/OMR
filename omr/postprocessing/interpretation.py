@@ -47,4 +47,5 @@ def calculate_pitch(y_center: float, staff_lines: List[int]) -> Pitch:
     position_index = round(vertical_offset / half_line_dist) + 10
 
     step, octave = TREBLE_CLEF_PITCH_MAP.get(position_index, ("C", 4))
+    
     return Pitch(step=step, octave=octave)

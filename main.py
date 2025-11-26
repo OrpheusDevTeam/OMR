@@ -7,10 +7,9 @@ import cv2
 from cv2.typing import MatLike
 from os import environ
 from pathlib import Path
-from typing import Any, List
+from typing import List
 
 from logger import setup_logging
-from mocker import mock_score
 from omr.detection.scanner.scan import scan
 from omr.exceptions import FileFormatNotSupportedError
 from omr.image_loader import load_images
@@ -68,7 +67,19 @@ def main(argv: List[str] | None = None) -> int:
             # 2. Preprocessing:
             # This returns an object that contains a list of staff region images (MatLike)
             # which have had the staff lines removed.
-            segmented_data = segmenter.segment_music_sheet(image, 5, 10)
+            segmented_data = segmenter.segment_music_sheet(image, 10, 10)
+            if (
+                segmented_data.staff_regions_no_lines is None
+                or len(segmented_data.staff_regions_no_lines) == 0
+            ):
+                parameters = [(x, y) for x in range(5, 20, 5) for y in range(5, 20, 5)]
+                for i, j in parameters:
+                    segmented_data = segmenter.segment_music_sheet(image, i, j)
+                    if (
+                        segmented_data.staff_regions_no_lines
+                        and len(segmented_data.staff_regions_no_lines) > 0
+                    ):
+                        break
 
             staves_coords = segmented_data.staves_coordinates
             processed_images = segmented_data.staff_regions_no_lines
@@ -112,15 +123,16 @@ def main(argv: List[str] | None = None) -> int:
                 continue
 
             music_score_segment = standarize_symbols(
-                segment_symbols, staff_lines=staff_coords
+                segment_symbols,
+                staff_lines=staff_coords,
+                original_grayscale_image=processed_images[i],
             )
             music_scores.append(music_score_segment)
 
         # For now, let's just process the first score
         # TODO: Combine scores from all segments
         if music_scores:
-            music_score = music_scores[0]
-            xml = score_to_musicxml(music_score)
+            xml = score_to_musicxml(music_scores)
             with open("output.musicxml", "w") as file:
                 file.write(xml)
                 filepath = os.path.abspath(file.name)

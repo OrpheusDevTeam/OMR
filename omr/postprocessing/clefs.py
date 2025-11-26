@@ -6,13 +6,13 @@ from omr.models.music_note import ClefType, LogicalNote, MeasureItem, TimeSignat
 from omr.models.symbols import Symbol
 from omr.postprocessing.constants import TIME_SIG_DIGIT_MAP
 
-logger = logging.getLogger(__name__)
-
 
 def extract_time_signature(
     detected_symbols: List[DetectedSymbol],
 ) -> Optional[TimeSignature]:
     """Detects time signature from symbols."""
+
+    logger = logging.getLogger(__name__)
     # Common / Cut time
     if any(s.symbol_class == Symbol.TIME_SIG_COMMON for s in detected_symbols):
         return TimeSignature(beats=4, beat_type=4, common=True)
@@ -46,6 +46,7 @@ def map_clef_changes_to_notes(
     """
     Map clef symbols to indices of LogicalNotes.
     """
+    logger = logging.getLogger(__name__)
     clef_changes: Dict[int, ClefType] = {}
     if not clef_symbols:
         return clef_changes

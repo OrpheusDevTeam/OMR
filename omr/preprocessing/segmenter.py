@@ -8,11 +8,10 @@ from omr.models.segmenter_output import SegmenterOutput
 
 INPAINT_RADIUS = 3  # radius for inpainting to remove lines
 
-logger = logging.getLogger(__name__)
-
 
 def preprocess_image(image: cv2.typing.MatLike):
     """Load and binarize image."""
+    logger = logging.getLogger(__name__)
     _, binary_image = cv2.threshold(
         image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
@@ -52,6 +51,7 @@ def group_staff_lines(detected_lines_mask, spacing_threshold=10):
 
     This compensates for slight imperfections in lines.
     """
+    logger = logging.getLogger(__name__)
     line_y_coords, _ = np.where(detected_lines_mask > 0)
     if len(line_y_coords) == 0:
         logger.warning("No staff lines detected.")
@@ -84,6 +84,7 @@ def group_into_staves(staff_line_positions, tolerance=None):
     1. Group consecutive lines that are spaced within `tolerance * 2`.
     2. Only keep groups containing at least 5 lines.
     """
+    logger = logging.getLogger(__name__)
     if not staff_line_positions:
         logger.warning("No staff line positions to group into staves.")
         return []
@@ -218,7 +219,7 @@ def segment_music_sheet(image, spacing_threshold=10, tolerance=15):
         tolerance=tolerance,
     )
 
-    logger.debug(f"Output: {len(staff_regions)} staff regions")
+    logging.getLogger(__name__).debug(f"Output: {len(staff_regions)} staff regions")
 
     return SegmenterOutput(
         staff_regions=staff_regions,
