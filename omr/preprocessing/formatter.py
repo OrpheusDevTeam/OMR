@@ -31,4 +31,4 @@ def straighten_picture(image: MatLike):
     angle = np.median(angles)
 
     M = cv2.getRotationMatrix2D((image.shape[1] // 2, image.shape[0] // 2), angle, 1.0)
-    return cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))
+    return cv2.warpAffine(image, M, (image.shape[1], image.shape[0]), borderMode=cv2.BORDER_REPLICATE)
