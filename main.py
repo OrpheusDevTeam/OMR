@@ -59,6 +59,8 @@ def main(argv: List[str] | None = None) -> int:
     try:
         # 1. Load Image(s)
         images_with_paths = process_paths(paths)
+        all_segments = []
+        all_staves = []
 
         for path, image in images_with_paths:
             logger.info(f"Starting segmentation and scanning for {path}.")
@@ -75,10 +77,7 @@ def main(argv: List[str] | None = None) -> int:
                 parameters = [(x, y) for x in range(5, 20, 5) for y in range(5, 20, 5)]
                 for i, j in parameters:
                     segmented_data = segmenter.segment_music_sheet(image, i, j)
-                    if (
-                        segmented_data.staff_regions_no_lines
-                        and len(segmented_data.staff_regions_no_lines) > 0
-                    ):
+                    if segmented_data.staff_regions_no_lines:
                         break
 
             staves_coords = segmented_data.staves_coordinates
@@ -95,7 +94,7 @@ def main(argv: List[str] | None = None) -> int:
 
             logger.info(f"Scan completed. Detected objects in {len(results)} regions.")
 
-            segments: List[List[DetectedSymbol]] = []
+            segments_for_image: List[List[DetectedSymbol]] = []
 
             for index, result in enumerate(results):
                 detected_symbols = [
@@ -103,20 +102,24 @@ def main(argv: List[str] | None = None) -> int:
                     for sym in (DetectedSymbol.from_yolo_detection(d) for d in result)
                     if sym is not None
                 ]
-                segments.append(detected_symbols)
+                segments_for_image.append(detected_symbols)
                 logger.debug(
                     f"Detected {len(detected_symbols)} symbols in {index} region of {path}."
                 )
+            
+            all_segments.extend(segments_for_image)
+            all_staves.extend(staves_coords)
+
 
         music_scores = []
 
-        if len(segments) != len(staves_coords):
+        if len(all_segments) != len(all_staves):
             logger.error(
                 "Mismatch between number of staff segments and coordinate lists."
             )
 
         for i, (segment_symbols, staff_coords) in enumerate(
-            zip(segments, staves_coords)
+            zip(all_segments, all_staves)
         ):
             if not segment_symbols:
                 logger.warning(f"Segment {i} has no symbols, skipping.")
@@ -129,8 +132,6 @@ def main(argv: List[str] | None = None) -> int:
             )
             music_scores.append(music_score_segment)
 
-        # For now, let's just process the first score
-        # TODO: Combine scores from all segments
         if music_scores:
             xml = score_to_musicxml(music_scores)
             with open("output.musicxml", "w") as file:
