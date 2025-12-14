@@ -6,30 +6,41 @@ from ultralytics import YOLO
 import signal
 import sys
 
+
 def handler(signum, frame):
     print(f"Received signal {signum}, saving checkpoint...")
     # Save checkpoint or partial results here
     sys.exit(1)
 
+
 signal.signal(signal.SIGTERM, handler)
 
+
 def load_sweep_config(csv_path, idx):
-    with open(csv_path, newline='') as f:
-        row = list(csv.DictReader(f))[int(idx)-1]
+    with open(csv_path, newline="") as f:
+        row = list(csv.DictReader(f))[int(idx) - 1]
 
     for k, v in row.items():
-        row[k] = float(v) if '.' in v else int(v)
+        row[k] = float(v) if "." in v else int(v)
 
     return row
 
+
 def append_to_csv(args, params, multipleGpus=True, results=None):
-    config_dict = {"epochs": int(params.get("epochs", 100)),
-                    "batch": int(params.get("batch", 16)),
-                    "lr": float(params.get("lr", 1e-3)),
-                    "imgsz": int(params.get("imgsz", 640))}
+    config_dict = {
+        "epochs": int(params.get("epochs", 100)),
+        "batch": int(params.get("batch", 16)),
+        "lr": float(params.get("lr", 1e-3)),
+        "imgsz": int(params.get("imgsz", 640)),
+    }
 
     if multipleGpus:
-        with open(args.workdir + "/run_" + args.idx + "/results.csv", "r", newline="", encoding="utf-8") as f:
+        with open(
+            args.workdir + "/run_" + args.idx + "/results.csv",
+            "r",
+            newline="",
+            encoding="utf-8",
+        ) as f:
             results_dict = list(csv.DictReader(f))[-1]
     else:
         results_dict = results.results_dict
@@ -45,6 +56,7 @@ def append_to_csv(args, params, multipleGpus=True, results=None):
                 writer.writeheader()
 
             writer.writerow(run_results_dict)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -64,19 +76,20 @@ def main():
     results = model.train(
         data=args.data,
         epochs=run_params["epochs"],
-        batch=128, # int(run_params["batch"]*args.gpuCount),
+        batch=128,  # int(run_params["batch"]*args.gpuCount),
         lr0=run_params["lr"],
         imgsz=run_params["imgsz"],
         project=args.workdir,
         name=f"run_{args.idx}",
         workers=16,
         device=list(range(int(args.gpuCount))) if args.gpuCount != "-1" else "cpu",
-        optimizer="AdamW"
+        optimizer="AdamW",
     )
     print("Training completed.")
-    
+
     append_to_csv(args, run_params)
     print("CSV saved.")
+
 
 if __name__ == "__main__":
     main()

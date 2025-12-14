@@ -1,25 +1,208 @@
-import logging
-
-import cv2
-from omr.preprocessing.segmenter import segment_music_sheet
 import argparse
+import json
+import logging
+import os
+import sys
+import cv2
+from cv2.typing import MatLike
+from os import environ
 from pathlib import Path
+from typing import List
 
-logging.basicConfig(level=logging.DEBUG)
+from logger import setup_logging
+from omr.detection.scanner.scan import scan
+from omr.exceptions import FileFormatNotSupportedError
+from omr.image_loader import load_images
+from omr.models.detected_symbol import DetectedSymbol
+from omr.postprocessing.pipeline import standarize_symbols
+from omr.postprocessing.convert_to_music_xml import score_to_musicxml
+from omr.preprocessing import segmenter
+from omr.preprocessing.formatter import straighten_picture
 
-parser = argparse.ArgumentParser()
+EXIT_SUCCESS = 0
+EXIT_UNSUPPORTED_FORMAT = 2
+EXIT_GENERIC_ERROR = 1
+EXIT_KEYBOARD_INTERRUPT = 130
 
-parser.add_argument("image")
+log_level = environ.get("OMR_LOG_LEVEL", None) or logging.DEBUG
+setup_logging(log_level)
+logger = logging.getLogger(__name__)
 
-args = parser.parse_args()
 
-image_path = Path(args.image)
+def process_paths(paths: List[str]) -> list[tuple[str, MatLike]]:
+    """Load images and return a list of materials."""
+    logger.info(f"Received {len(paths)} path(s) to process.")
+    images = load_images(paths)
+    logger.info(f"Successfully loaded {len(images)} image(s).")
+    return list(zip(paths, images))
 
-result = segment_music_sheet(image_path, spacing_threshold=5, tolerance=10)
 
-current_directory = Path(__file__).parent
-segmented_directory = current_directory.joinpath("segmented/")
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Optical Music Recognition tool")
+    parser.add_argument(
+        "paths",
+        nargs="+",
+        type=str,
+        help="Paths to image or PDF files (or both).",
+    )
+    return parser
 
-for i, region in enumerate(result.staff_regions_no_lines):
-    segmented_directory.mkdir(exist_ok=True)
-    cv2.imwrite(f"segmented/staff_no_{i}.png", region)
+
+def main(argv: List[str] | None = None) -> int:
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
+    paths = [p for p in args.paths if Path(p).exists()]
+    if not paths:
+        raise FileNotFoundError("None of the paths are valid")
+
+    try:
+        # 1. Load Image(s)
+        images_with_paths = process_paths(paths)
+        all_segments = []
+        all_staves = []
+
+        for path, image in images_with_paths:
+            logger.info(f"Starting segmentation and scanning for {path}.")
+            image = straighten_picture(image)
+
+            # 2. Preprocessing:
+            # This returns an object that contains a list of staff region images (MatLike)
+            # which have had the staff lines removed.
+            segmented_data = segmenter.segment_music_sheet(image, 10, 10)
+            if (
+                segmented_data.staff_regions_no_lines is None
+                or len(segmented_data.staff_regions_no_lines) == 0
+            ):
+                parameters = [(x, y) for x in range(5, 20, 5) for y in range(5, 20, 5)]
+                for i, j in parameters:
+                    segmented_data = segmenter.segment_music_sheet(image, i, j)
+                    if segmented_data.staff_regions_no_lines:
+                        break
+
+            staves_coords = segmented_data.staves_coordinates
+            processed_images = segmented_data.staff_regions_no_lines
+
+            # 3. Scanning/Detection
+            # FIXME TEMPORARY!!!!! Convert grayscale to RGB
+            # Later, the YOLO model will be trained on grayscale images directly
+            processed_images = [
+                cv2.cvtColor(img, cv2.COLOR_GRAY2RGB) for img in processed_images
+            ]
+
+            results = scan(processed_images, True)
+
+            logger.info(f"Scan completed. Detected objects in {len(results)} regions.")
+
+            segments_for_image: List[List[DetectedSymbol]] = []
+
+            for index, result in enumerate(results):
+                detected_symbols = [
+                    sym
+                    for sym in (DetectedSymbol.from_yolo_detection(d) for d in result)
+                    if sym is not None
+                ]
+                segments_for_image.append(detected_symbols)
+                logger.debug(
+                    f"Detected {len(detected_symbols)} symbols in {index} region of {path}."
+                )
+            
+            all_segments.extend(segments_for_image)
+            all_staves.extend(staves_coords)
+
+
+        music_scores = []
+
+        if len(all_segments) != len(all_staves):
+            logger.error(
+                "Mismatch between number of staff segments and coordinate lists."
+            )
+
+        for i, (segment_symbols, staff_coords) in enumerate(
+            zip(all_segments, all_staves)
+        ):
+            if not segment_symbols:
+                logger.warning(f"Segment {i} has no symbols, skipping.")
+                continue
+
+            music_score_segment = standarize_symbols(
+                segment_symbols,
+                staff_lines=staff_coords,
+                original_grayscale_image=processed_images[i],
+            )
+            music_scores.append(music_score_segment)
+
+        if music_scores:
+            xml = score_to_musicxml(music_scores)
+            with open("output.musicxml", "w") as file:
+                file.write(xml)
+                filepath = os.path.abspath(file.name)
+        else:
+            # TODO Handle case with no scores
+            filepath = ""
+
+        print(
+            json.dumps(
+                {
+                    "status": "success",
+                    "filepath": filepath,
+                }
+            )
+        )
+        return EXIT_SUCCESS
+
+    except FileFormatNotSupportedError as e:
+        logger.exception(e)
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_type": "FileFormatNotSupportedError",
+                    "message": str(e),
+                }
+            )
+        )
+        return EXIT_UNSUPPORTED_FORMAT
+
+    except FileNotFoundError as e:
+        logger.exception(e)
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_type": "FileNotFoundError",
+                    "message": str(e),
+                }
+            )
+        )
+        return EXIT_GENERIC_ERROR
+
+    except KeyboardInterrupt:
+        logger.warning("Process interrupted by user.")
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_type": "KeyboardInterrupt",
+                    "message": "Execution interrupted by user.",
+                }
+            )
+        )
+        return EXIT_KEYBOARD_INTERRUPT
+
+    except Exception as e:
+        logger.exception("Unhandled exception occurred.")
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_type": type(e).__name__,
+                    "message": str(e),
+                }
+            )
+        )
+        return EXIT_GENERIC_ERROR
+
+
+if __name__ == "__main__":
+    sys.exit(main())

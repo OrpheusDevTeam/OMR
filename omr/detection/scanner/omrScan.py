@@ -9,11 +9,12 @@ from ultralytics import YOLO
 
 import omr.preprocessing.segmenter as segmenter
 
+
 def extract_labels_for_boxes(results, model):
     boxes = results.boxes
     labels_with_confidence = []
     raw_labels = []
-    
+
     for cls, conf in zip(boxes.cls, boxes.conf):
         label = model.model.names[int(cls)]
 
@@ -21,11 +22,16 @@ def extract_labels_for_boxes(results, model):
         raw_labels.append(label)
     return labels_with_confidence, raw_labels
 
+
 def parse_to_list(results, labels):
     boxes = results.boxes
-    parsed = [{"class": labels[i], "bounding_box": boxes.xyxy[i].tolist()} for i in range(len(labels))]
+    parsed = [
+        {"class": labels[i], "bounding_box": boxes.xyxy[i].tolist()}
+        for i in range(len(labels))
+    ]
 
     return parsed
+
 
 def parse_config(path):
     config = json.load(open(BASE_PATH + "/omr/detection/scanner/modelConfig.json"))
@@ -34,6 +40,7 @@ def parse_config(path):
         config[key] = BASE_PATH + config[key]
 
     return config
+
 
 def main():
     global BASE_PATH
@@ -56,22 +63,32 @@ def main():
 
     results = model.predict(
         source=processed,
-        save=False, 
-        device=0 if torch.cuda.is_available() else 'cpu',
-        verbose=False
+        save=False,
+        device=0 if torch.cuda.is_available() else "cpu",
+        verbose=False,
     )
 
     labels = extract_labels_for_boxes(results[0], model)
 
     # For debugging purposes only - save annotated images
-    
+
     import omr.detection.scanner.scan as scan
+
     for i in range(len(results)):
-        os.makedirs(BASE_PATH + "/omr/detection/scanner/results/segmented/", exist_ok=True)
-        scan.save_file(results[i], labels, BASE_PATH + "/omr/detection/scanner/results/segmented/result_" + str(i) + ".png")
-    
+        os.makedirs(
+            BASE_PATH + "/omr/detection/scanner/results/segmented/", exist_ok=True
+        )
+        scan.save_file(
+            results[i],
+            labels,
+            BASE_PATH
+            + "/omr/detection/scanner/results/segmented/result_"
+            + str(i)
+            + ".png",
+        )
 
     return [parse_to_list(result, labels) for result in results]
+
 
 if __name__ == "__main__":
     main()

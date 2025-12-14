@@ -5,22 +5,15 @@ import numpy as np
 
 from omr.models.segmenter_output import SegmenterOutput
 
-STAFF_MARGIN = 35  # pixels above and below staff lines to include in segment
+
 INPAINT_RADIUS = 3  # radius for inpainting to remove lines
 
-logger = logging.getLogger(__name__)
 
-
-def preprocess_image(img_path):
+def preprocess_image(image: cv2.typing.MatLike):
     """Load and binarize image."""
-    grayscale_image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-
-    if grayscale_image is None:
-        logger.error(f"Failed to load image: {img_path}")
-        raise ValueError(f"Could not read image: {img_path}")
-
+    logger = logging.getLogger(__name__)
     _, binary_image = cv2.threshold(
-        grayscale_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
 
     logger.debug(f"Image shape: {binary_image.shape}, dtype: {binary_image.dtype}")
@@ -58,6 +51,7 @@ def group_staff_lines(detected_lines_mask, spacing_threshold=10):
 
     This compensates for slight imperfections in lines.
     """
+    logger = logging.getLogger(__name__)
     line_y_coords, _ = np.where(detected_lines_mask > 0)
     if len(line_y_coords) == 0:
         logger.warning("No staff lines detected.")
@@ -82,7 +76,7 @@ def group_staff_lines(detected_lines_mask, spacing_threshold=10):
     return grouped_lines
 
 
-def group_into_staves(staff_line_positions, tolerance=15):
+def group_into_staves(staff_line_positions, tolerance=None):
     """
     Combine detected line positions into full staves (groups of 5 lines).
 
@@ -90,9 +84,19 @@ def group_into_staves(staff_line_positions, tolerance=15):
     1. Group consecutive lines that are spaced within `tolerance * 2`.
     2. Only keep groups containing at least 5 lines.
     """
+    logger = logging.getLogger(__name__)
     if not staff_line_positions:
         logger.warning("No staff line positions to group into staves.")
         return []
+
+    if (
+        tolerance is None and len(staff_line_positions) > 1
+    ):  # tolerance based on average spacing
+        diffs = np.diff(staff_line_positions)
+        avg_diff = np.mean(diffs)
+        tolerance = int(avg_diff * 1.3)
+    elif tolerance is None:
+        tolerance = 15  # tolerance if only one line detected
 
     all_staves = []
     current_staff = [staff_line_positions[0]]
@@ -112,6 +116,12 @@ def group_into_staves(staff_line_positions, tolerance=15):
     return all_staves
 
 
+def compute_spacing(staff_lines):
+    """Compute average spacing between staff lines."""
+    diffs = np.diff(staff_lines)
+    return float(np.mean(diffs))
+
+
 def remove_staff_lines(binary_image, detected_lines_mask):
     """Remove detected staff lines using inpainting."""
     no_staff = cv2.inpaint(
@@ -121,6 +131,16 @@ def remove_staff_lines(binary_image, detected_lines_mask):
         flags=cv2.INPAINT_TELEA,
     )
     return no_staff
+
+
+def compute_inter_staff_margins(all_staves):
+    margins = []
+    for i in range(len(all_staves) - 1):
+        bottom_current = all_staves[i][-1]
+        top_next = all_staves[i + 1][0]
+        distance = top_next - bottom_current
+        margins.append(max(0, distance // 2))
+    return margins
 
 
 def segment_staves(
@@ -138,18 +158,35 @@ def segment_staves(
     staff_line_positions = group_staff_lines(detected_lines_mask, spacing_threshold)
     all_staves = group_into_staves(staff_line_positions, tolerance)
 
+    inter_margins = compute_inter_staff_margins(all_staves)
+
     staff_regions = []
+    for i, staff_lines in enumerate(all_staves):
+        if len(inter_margins) <= 1:
+            margin_top = 10
+            margin_bottom = 10
+        else:
+            # top margin comes from distance to previous stave
+            if i == 0:
+                margin_top = inter_margins[0]
+            else:
+                margin_top = inter_margins[i - 1]
 
-    for staff_lines in all_staves:
-        top_boundary = max(staff_lines[0] - STAFF_MARGIN, 0)
-        bottom_boundary = min(staff_lines[-1] + STAFF_MARGIN, binary_image.shape[0])
-        staff_crop = binary_image[top_boundary:bottom_boundary, :]
-        staff_regions.append(staff_crop)
+            if i == len(all_staves) - 1:
+                margin_bottom = inter_margins[-1]
+            else:
+                margin_bottom = inter_margins[i]
 
-    return staff_regions
+        top_boundary = max(0, staff_lines[0] - margin_top)
+        bottom_boundary = min(binary_image.shape[0], staff_lines[-1] + margin_bottom)
+
+        crop = binary_image[top_boundary:bottom_boundary, :]
+        staff_regions.append((crop, [y - top_boundary for y in staff_lines]))
+
+    return [r[0] for r in staff_regions], [r[1] for r in staff_regions]
 
 
-def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
+def segment_music_sheet(image, spacing_threshold=10, tolerance=15):
     """
     Run the full segmentation pipeline on a sheet music image.
 
@@ -169,24 +206,25 @@ def segment_music_sheet(img_path, spacing_threshold=10, tolerance=15):
             staff_regions: list of original staff crops (with lines)
             staff_regions_no_lines: list of same regions after line removal
     """
-    binary = preprocess_image(img_path)
+    binary = preprocess_image(image)
     detected_lines = detect_staff_lines(binary)
-    staff_regions = segment_staves(
+    staff_regions, all_staves = segment_staves(
         binary, detected_lines, spacing_threshold=spacing_threshold, tolerance=tolerance
     )
     no_staff = remove_staff_lines(binary, detected_lines)
-    staff_regions_no_lines = segment_staves(
+    staff_regions_no_lines, _ = segment_staves(
         no_staff,
         detected_lines,
         spacing_threshold=spacing_threshold,
         tolerance=tolerance,
     )
 
-    logger.debug(f"Output: {len(staff_regions)} staff regions")
+    logging.getLogger(__name__).debug(f"Output: {len(staff_regions)} staff regions")
 
     return SegmenterOutput(
         staff_regions=staff_regions,
         staff_regions_no_lines=[
             cv2.bitwise_not(region) for region in staff_regions_no_lines
         ],
+        staves_coordinates=all_staves,
     )

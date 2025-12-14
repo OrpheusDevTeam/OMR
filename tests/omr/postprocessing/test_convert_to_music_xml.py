@@ -1,14 +1,16 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from jinja2 import TemplateNotFound
+
 from omr.models.music_note import (
-    Pitch,
+    ClefType,
+    DurationType,
     LogicalNote,
     Measure,
-    DurationType,
     MusicScore,
+    Pitch,
     TimeSignature,
-    ClefType,
 )
 from omr.postprocessing.convert_to_music_xml import score_to_musicxml
 

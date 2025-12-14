@@ -14,18 +14,23 @@ space = {
 DO_RANDOM = False
 N_RANDOM = 20
 
+
 def expand_grid(space):
     keys = list(space.keys())
     vals = [space[k] for k in keys]
     for combo in itertools.product(*vals):
         yield dict(zip(keys, combo))
 
+
 def random_sample(space, n):
     keys = list(space.keys())
     for _ in range(n):
         yield {k: random.choice(space[k]) for k in keys}
 
-configs = list(random_sample(space, N_RANDOM)) if DO_RANDOM else list(expand_grid(space))
+
+configs = (
+    list(random_sample(space, N_RANDOM)) if DO_RANDOM else list(expand_grid(space))
+)
 
 with OUT.open("w", newline="") as f:
     writer = csv.DictWriter(f, fieldnames=list(configs[0].keys()))

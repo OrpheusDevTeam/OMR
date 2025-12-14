@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from enum import StrEnum
-from typing import Dict, List, Optional
-from pydantic import BaseModel
+from typing import Dict, List, Optional, Union
+
+from pydantic import BaseModel, Field
 
 from omr.models.symbols import Symbol
 
@@ -25,10 +27,20 @@ class LogicalNote(BaseModel):
     duration: DurationType
     dots: int = 0
     voice: int = 1
+    x_position: Optional[float]  # x coordinate in the image for reference
+
+
+class LogicalRest(BaseModel):
+    duration: DurationType
+    dots: int = 0
+    x_position: Optional[float]  # x coordinate in the image for reference
+
+
+MeasureItem = Union[LogicalNote, LogicalRest]
 
 
 class Measure(BaseModel):
-    notes: List[LogicalNote]
+    items: List[MeasureItem]
 
 
 class ClefType(StrEnum):
@@ -56,4 +68,4 @@ class TimeSignature(BaseModel):
 class MusicScore(BaseModel):
     measures: List[Measure]
     time_signature: TimeSignature = TimeSignature(beats=4, beat_type=4)
-    clef_changes: Dict[int, ClefType] = []
+    clef_changes: Dict[int, ClefType] = Field(default_factory=dict)

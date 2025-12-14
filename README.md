@@ -26,6 +26,11 @@ python3 main.py path/to/your/image.png
 
 The script will perform segmentation on the input image. The segmented parts of the music sheet, like staves without lines, will be saved in the `segmented/` directory.
 
+### Environmental variables
+
+The system accepts optional environmental variables:
+- `OMR_LOG_DIR`: string path to the directory where the logs are supposed to be stored, overrides default `logs/` directory 
+
 ## Pipeline Overview
 
 The Optical Music Recognition (OMR) process is structured into four main stages:
